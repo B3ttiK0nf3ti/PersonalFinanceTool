@@ -9,6 +9,11 @@ import {
   Box,
   Snackbar,
   Alert,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  InputAdornment,
 } from "@mui/material";
 import {
   LineChart,
@@ -22,6 +27,7 @@ import {
 } from "recharts";
 import axios from "axios";
 import QRCode from "react-qr-code";
+import Autocomplete from "@mui/lab/Autocomplete";
 
 // Passwortvalidierung
 const passwordValidation = (password) => {
@@ -196,15 +202,42 @@ const AuthForm = ({ onLogin }) => {
 };
 
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // Zustand der Authentifizierung
   const [transaction, setTransaction] = useState({
     type: "",
     amount: "",
     category: "",
+    date: "",
   });
   const [transactions, setTransactions] = useState([]);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const budget = 500;
+  const [budget, setBudget] = useState(500); // Budget-Feld
+  const [filterCategory, setFilterCategory] = useState(""); // Filter für Kategorien
+  const [filterPeriod, setFilterPeriod] = useState("7"); // Filter für Zeitraum (7 Tage, z.B.)
+
+  // Kategorien für Einnahmen und Ausgaben
+  const incomeCategories = [
+    "Lohn/ Gehalt",
+    "Einkünfte aus selbstständiger Tätigkeit – Unternehmerlohn",
+    "Förderungen",
+    "Rente/ Pension",
+    "Staatliche Förderungen",
+    "Geldgeschenke",
+    "Dividenden/ Zinsen",
+    "Sonstige Einnahmen",
+  ];
+
+  const expenseCategories = [
+    "Wohnen",
+    "Leben",
+    "Gesundheit und Fürsorge",
+    "Hobbys, Freizeit und Sport",
+    "Mobilität",
+    "Beruf/ Bildung",
+    "Tierhaltung",
+    "Weitere Ausgabenarten",
+    "Versicherungen und Steuern",
+    "Kredite und Finanzierung",
+    "Sonstiges",
+  ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -218,98 +251,209 @@ const App = () => {
       return;
     }
 
-    if (parseFloat(transaction.amount) > budget) {
-      setOpenSnackbar(true);
-    }
-
     setTransactions([...transactions, transaction]);
-    setTransaction({ type: "", amount: "", category: "" });
+    setTransaction({ type: "", amount: "", category: "", date: "" });
   };
 
-  const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
-  };
+  // Filtern der Transaktionen nach Kategorie und Zeitraum
+  const filteredTransactions = transactions.filter((trans) => {
+    const withinPeriod = filterPeriod
+      ? new Date(trans.date) >=
+        new Date(Date.now() - filterPeriod * 24 * 60 * 60 * 1000)
+      : true;
+    const byCategory = filterCategory
+      ? trans.category === filterCategory
+      : true;
+    return withinPeriod && byCategory;
+  });
 
   return (
-    <>
-      {!isAuthenticated ? (
-        <AuthForm onLogin={setIsAuthenticated} />
-      ) : (
-        <Container maxWidth="sm" style={{ marginTop: "50px" }}>
-          <Paper style={{ padding: "20px" }}>
-            <Typography variant="h4" align="center" gutterBottom>
-              Finanzübersicht
-            </Typography>
-            <form onSubmit={handleSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Typ (Einnahme/Ausgabe)"
-                    variant="outlined"
-                    name="type"
-                    value={transaction.type}
-                    onChange={handleChange}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Betrag"
-                    variant="outlined"
-                    name="amount"
-                    type="number"
-                    value={transaction.amount}
-                    onChange={handleChange}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Kategorie"
-                    variant="outlined"
-                    name="category"
-                    value={transaction.category}
-                    onChange={handleChange}
-                  />
-                </Grid>
-                <Grid item xs={12}>
+    <Container maxWidth="sm" style={{ marginTop: "50px" }}>
+      <Paper style={{ padding: "20px" }}>
+        <Typography variant="h4" align="center" gutterBottom>
+          Finanzübersicht
+        </Typography>
+
+        {/* Filter-Bereich */}
+        <Box mb={3} p={2} bgcolor="#f1f1f1" borderRadius={2}>
+          <Grid container spacing={2} direction="column">
+            <Grid item>
+              <TextField
+                label="Budget"
+                variant="outlined"
+                fullWidth
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">€</InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+
+            {/* Zeitraum-Filter */}
+            <Grid item>
+              <FormControl fullWidth>
+                <InputLabel>Zeitraum</InputLabel>
+                <Select
+                  value={filterPeriod}
+                  onChange={(e) => setFilterPeriod(e.target.value)}
+                  label="Zeitraum"
+                >
+                  <MenuItem value="7">Letzte 7 Tage</MenuItem>
+                  <MenuItem value="30">Letzte 30 Tage</MenuItem>
+                  <MenuItem value="365">Letztes Jahr</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Kategorien-Filter */}
+            <Grid item>
+              <Autocomplete
+                fullWidth
+                value={filterCategory}
+                onChange={(event, newValue) => setFilterCategory(newValue)}
+                options={[...incomeCategories, ...expenseCategories, "Alle"]}
+                renderInput={(params) => (
+                  <TextField {...params} label="Kategorie" />
+                )}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Transaktionseingabe */}
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Typography variant="h6" align="center" gutterBottom>
+                Wählen Sie den Transaktionstyp:
+              </Typography>
+              <Grid container justifyContent="center" spacing={2}>
+                <Grid item>
                   <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    fullWidth
+                    variant="outlined"
+                    color={
+                      transaction.type === "Einnahme" ? "primary" : "default"
+                    }
+                    onClick={() =>
+                      setTransaction({ ...transaction, type: "Einnahme" })
+                    }
                   >
-                    Hinzufügen
+                    Einnahme
+                  </Button>
+                </Grid>
+                <Grid item>
+                  <Button
+                    variant="outlined"
+                    color={
+                      transaction.type === "Ausgabe" ? "primary" : "default"
+                    }
+                    onClick={() =>
+                      setTransaction({ ...transaction, type: "Ausgabe" })
+                    }
+                  >
+                    Ausgabe
                   </Button>
                 </Grid>
               </Grid>
-            </form>
-          </Paper>
+            </Grid>
 
-          <Box marginTop={4}>
-            <Typography variant="h6" gutterBottom>
-              Transaktionen:
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Datum"
+                variant="outlined"
+                name="date"
+                type="date"
+                value={transaction.date}
+                onChange={handleChange}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                required
+              />
+            </Grid>
+
+            {/* Betrag Eingabe */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Betrag"
+                variant="outlined"
+                name="amount"
+                type="number"
+                value={transaction.amount}
+                onChange={handleChange}
+              />
+            </Grid>
+
+            {/* Dropdown für die Kategorien, abhängig vom Transaktionstyp */}
+            <Grid item xs={12}>
+              <Autocomplete
+                fullWidth
+                value={transaction.category}
+                onChange={(event, newValue) =>
+                  setTransaction({ ...transaction, category: newValue })
+                }
+                options={
+                  transaction.type === "Einnahme"
+                    ? [...incomeCategories, "Sonstige"]
+                    : [...expenseCategories, "Sonstige"]
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Kategorie" required />
+                )}
+              />
+            </Grid>
+
+            {/* Hinzufügen Button */}
+            <Grid item xs={12}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                fullWidth
+              >
+                Hinzufügen
+              </Button>
+            </Grid>
+          </Grid>
+        </form>
+      </Paper>
+
+      <Box marginTop={4}>
+        <Typography variant="h6" gutterBottom>
+          Transaktionen:
+        </Typography>
+        <Paper style={{ padding: "10px" }}>
+          {transactions.length > 0 ? (
+            transactions.map((trans, index) => {
+              const isIncome = trans.type === "Einnahme";
+              return (
+                <Box key={index} marginBottom={2}>
+                  <Typography
+                    variant="body1"
+                    style={{
+                      color: isIncome ? "#4CAF50" : "#FF5733", // Grün für Einnahmen, Rot für Ausgaben
+                      padding: "5px",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    {trans.type} - {trans.amount} EUR - {trans.category}
+                  </Typography>
+                </Box>
+              );
+            })
+          ) : (
+            <Typography variant="body2" color="textSecondary">
+              Keine Transaktionen vorhanden.
             </Typography>
-            <Paper style={{ padding: "10px" }}>
-              {transactions.length > 0 ? (
-                transactions.map((trans, index) => (
-                  <Box key={index} marginBottom={2}>
-                    <Typography variant="body1">
-                      {trans.type} - {trans.amount} EUR - {trans.category}
-                    </Typography>
-                  </Box>
-                ))
-              ) : (
-                <Typography variant="body2" color="textSecondary">
-                  Keine Transaktionen vorhanden.
-                </Typography>
-              )}
-            </Paper>
-          </Box>
-        </Container>
-      )}
-    </>
+          )}
+        </Paper>
+      </Box>
+    </Container>
   );
 };
 
