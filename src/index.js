@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import "./index.css"; // Falls du ein eigenes Stylesheet hast
+import "./index.css"; // eigenes Stylesheet
 import App from "./App"; // Hauptkomponente
 import reportWebVitals from "./reportWebVitals"; // Optional, falls du Web-Vital-Daten tracken möchtest
 
