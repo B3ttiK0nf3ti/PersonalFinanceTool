@@ -94,7 +94,9 @@ const AuthForm = ({ onLogin }) => {
           setOpenSnackbar(true);
         } else {
           localStorage.setItem("authToken", response.data.token);
-          onLogin(true); // Authentifizierung erfolgreich, weiter zum Dashboard
+          localStorage.setItem("userEmail", formData.email); // E-Mail korrekt speichern
+          onLogin(formData.email); // E-Mail als Argument übergeben
+          console.log("E-Mail beim Absenden:", formData.email); // Debugging-Ausgabe
         }
       } else {
         setSnackbarMessage(response.data.message || "Unbekannter Fehler");
@@ -244,15 +246,37 @@ const App = () => {
     setTransaction({ ...transaction, [name]: value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!transaction.type || !transaction.amount || !transaction.category) {
       alert("Bitte alle Felder ausfüllen!");
       return;
     }
 
-    setTransactions([...transactions, transaction]);
-    setTransaction({ type: "", amount: "", category: "", date: "" });
+    // Transaktionsdaten an den Server senden
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:5000/api/transactions",
+        {
+          user_id: "user123", // Benutzer-ID hier setzen
+          amount: transaction.amount,
+          type: transaction.type,
+          category: transaction.category,
+          date: transaction.date,
+        }
+      );
+
+      if (response.data.success) {
+        // Erfolgreich gespeichert, Transaktion zur Anzeige hinzufügen
+        setTransactions([...transactions, transaction]);
+        setTransaction({ type: "", amount: "", category: "", date: "" });
+      } else {
+        alert("Fehler beim Speichern der Transaktion");
+      }
+    } catch (error) {
+      console.error("Fehler beim Senden der Transaktion:", error);
+      alert("Fehler beim Speichern der Transaktion");
+    }
   };
 
   // Filtern der Transaktionen nach Kategorie und Zeitraum
@@ -266,6 +290,24 @@ const App = () => {
       : true;
     return withinPeriod && byCategory;
   });
+
+  const [user, setUser] = useState(localStorage.getItem("userEmail")); // E-Mail-Adresse aus localStorage holen
+
+  const handleLogin = (email) => {
+    console.log("E-Mail in handleLogin:", email); // Debugging-Ausgabe
+    setUser(email); // E-Mail in den State setzen
+    localStorage.setItem("userEmail", email); // E-Mail im localStorage speichern
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userEmail");
+    setUser(null); // E-Mail zurücksetzen
+  };
+
+  if (!user) {
+    return <AuthForm onLogin={handleLogin} />; // Zeige AuthForm an, wenn nicht eingeloggt
+  }
 
   return (
     <Container maxWidth="sm" style={{ marginTop: "50px" }}>
@@ -452,6 +494,28 @@ const App = () => {
             </Typography>
           )}
         </Paper>
+      </Box>
+      {/* Benutzer angezeigt, wenn eingeloggt */}
+      <Box marginBottom={2}>
+        <Typography variant="h6" align="center">
+          Angemeldet als: {user}.
+        </Typography>
+      </Box>
+      <Box marginBottom={5}>
+        {" "}
+        {/* Hier den Abstand zu den anderen Bereichen erhöhen */}
+        {user && (
+          <Box marginTop={4}>
+            <Button
+              variant="contained"
+              color="secondary"
+              fullWidth
+              onClick={handleLogout}
+            >
+              Abmelden
+            </Button>
+          </Box>
+        )}
       </Box>
     </Container>
   );
