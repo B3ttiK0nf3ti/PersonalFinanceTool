@@ -13,6 +13,7 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
+  IconButton,
   InputAdornment,
 } from "@mui/material";
 import {
@@ -25,9 +26,13 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import Chart from "chart.js/auto";
 import axios from "axios";
 import QRCode from "react-qr-code";
 import Autocomplete from "@mui/lab/Autocomplete";
+import DeleteIcon from "@mui/icons-material/Delete";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import { Bar } from "react-chartjs-2";
 
 // Passwortvalidierung
 const passwordValidation = (password) => {
@@ -216,7 +221,18 @@ const App = () => {
   });
   const [transactions, setTransactions] = useState([]);
   const [filterCategory, setFilterCategory] = useState(""); // Filter für Kategorien
-  const [filterPeriod, setFilterPeriod] = useState("7"); // Filter für Zeitraum (7 Tage, z.B.)
+  const [filterPeriod, setFilterPeriod] = useState(""); // Filter für Zeitraum (7 Tage, z.B.)
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
+
+  const totalIncome = transactions
+    .filter((trans) => trans.type === "Einnahme")
+    .reduce((sum, trans) => sum + parseFloat(trans.amount), 0);
+
+  const totalExpenses = transactions
+    .filter((trans) => trans.type === "Ausgabe")
+    .reduce((sum, trans) => sum + parseFloat(trans.amount), 0);
+
+  const totalBalance = totalIncome - totalExpenses;
 
   // Kategorien für Einnahmen und Ausgaben
   const incomeCategories = [
@@ -324,20 +340,33 @@ const App = () => {
 
   const fetchTransactions = async () => {
     const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) return;
+    if (!accessToken) {
+      console.error("Kein Zugriffstoken gefunden!");
+      return;
+    }
 
     try {
-      const response = await fetch("/api/transactions", {
+      const response = await fetch(`http://127.0.0.1:5000/api/transactions`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       });
 
+      // Logge die Antwort vor der Verarbeitung
+      const textResponse = await response.text(); // Antwort als Text lesen
+      console.log("Antwort vom Server:", textResponse);
+
+      // Überprüfe, ob die Antwort JSON ist, bevor du versuchst, sie zu parsen
       if (response.ok) {
-        const data = await response.json();
-        setTransactions(data); // Transaktionen in den State setzen
+        try {
+          const data = JSON.parse(textResponse); // Manuelles Parsen
+          console.log("Transaktionen:", data);
+          setTransactions(data); // Alle Transaktionen setzen
+        } catch (e) {
+          console.error("Fehler beim Parsen der JSON-Antwort:", e);
+        }
       } else {
-        console.error("Fehler beim Laden der Transaktionen.");
+        console.error("Fehler beim Abrufen der Transaktionen:", textResponse);
       }
     } catch (error) {
       console.error("Fehler:", error);
@@ -349,17 +378,87 @@ const App = () => {
     fetchTransactions();
   }, []);
 
-  // Filtern der Transaktionen nach Kategorie und Zeitraum
   const filteredTransactions = transactions.filter((trans) => {
+    const now = Date.now();
     const withinPeriod = filterPeriod
-      ? new Date(trans.date) >=
-        new Date(Date.now() - filterPeriod * 24 * 60 * 60 * 1000)
+      ? new Date(trans.date).getTime() >=
+        now - parseInt(filterPeriod) * 24 * 60 * 60 * 1000
       : true;
-    const byCategory = filterCategory
-      ? trans.category === filterCategory
-      : true;
+
+    const byCategory =
+      filterCategory && filterCategory !== "Alle"
+        ? trans.category === filterCategory
+        : true;
+
+    console.log(
+      `Transaktion ${trans.id}: Zeitraum-Filter -> ${withinPeriod}, Kategorie-Filter -> ${byCategory}`
+    );
+
     return withinPeriod && byCategory;
   });
+
+  console.log("Gefilterte Transaktionen:", filteredTransactions);
+
+  const resetFilters = () => {
+    setFilterCategory(""); // Zurücksetzen der Kategorie
+    setFilterPeriod(""); // Zurücksetzen des Zeitraums
+  };
+
+  // Chart-Daten vorbereiten
+  const chartData = {
+    labels: ["Einnahmen", "Ausgaben"],
+    datasets: [
+      {
+        label: "Betrag in EUR",
+        data: [totalIncome, totalExpenses],
+        backgroundColor: ["#4CAF50", "#FF5733"],
+        borderColor: ["#4CAF50", "#FF5733"],
+        borderWidth: 1,
+      },
+    ],
+  };
+  // Chart Optionen
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: "top",
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  const handleDeleteTransaction = async (transactionId) => {
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) return;
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:5000/api/transactions/${transactionId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
+      if (response.ok) {
+        // Transaktion lokal entfernen
+        setTransactions(
+          transactions.filter((trans) => trans.id !== transactionId)
+        );
+      } else {
+        console.error("Fehler beim Löschen der Transaktion.");
+        alert("Fehler beim Löschen der Transaktion.");
+      }
+    } catch (error) {
+      console.error("Fehler:", error);
+      alert("Fehler beim Löschen der Transaktion.");
+    }
+  };
 
   const [user, setUser] = useState(localStorage.getItem("userEmail")); // E-Mail-Adresse aus localStorage holen
 
@@ -367,6 +466,9 @@ const App = () => {
     console.log("E-Mail in handleLogin:", email); // Debugging-Ausgabe
     setUser(email); // E-Mail in den State setzen
     localStorage.setItem("userEmail", email); // E-Mail im localStorage speichern
+
+    // Rufe fetchTransactions direkt nach dem Login auf
+    fetchTransactions(); // Transaktionen nach dem Login abrufen
   };
 
   const handleLogout = () => {
@@ -385,40 +487,6 @@ const App = () => {
         <Typography variant="h4" align="center" gutterBottom>
           Finanzübersicht
         </Typography>
-
-        {/* Filter-Bereich */}
-        <Box mb={3} p={2} bgcolor="#f1f1f1" borderRadius={2}>
-          <Grid container spacing={2} direction="column">
-            {/* Zeitraum-Filter */}
-            <Grid item>
-              <FormControl fullWidth>
-                <InputLabel>Zeitraum</InputLabel>
-                <Select
-                  value={filterPeriod}
-                  onChange={(e) => setFilterPeriod(e.target.value)}
-                  label="Zeitraum"
-                >
-                  <MenuItem value="7">Letzte 7 Tage</MenuItem>
-                  <MenuItem value="30">Letzte 30 Tage</MenuItem>
-                  <MenuItem value="365">Letztes Jahr</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {/* Kategorien-Filter */}
-            <Grid item>
-              <Autocomplete
-                fullWidth
-                value={filterCategory}
-                onChange={(event, newValue) => setFilterCategory(newValue)}
-                options={[...incomeCategories, ...expenseCategories, "Alle"]}
-                renderInput={(params) => (
-                  <TextField {...params} label="Kategorie" />
-                )}
-              />
-            </Grid>
-          </Grid>
-        </Box>
 
         {/* Transaktionseingabe */}
         <form onSubmit={handleTransactionSubmit}>
@@ -483,6 +551,10 @@ const App = () => {
                 type="number"
                 value={transaction.amount}
                 onChange={handleChange}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                required
               />
             </Grid>
 
@@ -502,6 +574,10 @@ const App = () => {
                 renderInput={(params) => (
                   <TextField {...params} label="Kategorie" required />
                 )}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                required
               />
             </Grid>
 
@@ -518,6 +594,70 @@ const App = () => {
             </Grid>
           </Grid>
         </form>
+
+        {/* Filtersymbol hinzufügen */}
+        <Box mb={3}>
+          <IconButton
+            onClick={() => setIsFilterVisible(!isFilterVisible)}
+            color="primary"
+          >
+            <FilterListIcon />
+          </IconButton>
+        </Box>
+
+        {/* Filter-Bereich */}
+        {isFilterVisible && (
+          <Box mb={3} p={2} bgcolor="#f1f1f1" borderRadius={2}>
+            <Grid container spacing={2} direction="column">
+              {/* Zeitraum-Filter */}
+              <Grid item>
+                <FormControl fullWidth>
+                  <InputLabel>Zeitraum</InputLabel>
+                  <Select
+                    value={filterPeriod}
+                    onChange={(e) => setFilterPeriod(e.target.value)}
+                    label="Zeitraum"
+                  >
+                    <MenuItem value="7">Letzte 7 Tage</MenuItem>
+                    <MenuItem value="30">Letzte 30 Tage</MenuItem>
+                    <MenuItem value="365">Letztes Jahr</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Kategorien-Filter */}
+              <Grid item>
+                <Autocomplete
+                  fullWidth
+                  value={filterCategory}
+                  onChange={(event, newValue) => setFilterCategory(newValue)}
+                  options={[...incomeCategories, ...expenseCategories, "Alle"]}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Kategorie" />
+                  )}
+                />
+              </Grid>
+            </Grid>
+
+            {/* Filter anwenden und zurücksetzen Buttons horizontal ausgerichtet */}
+            <Box display="flex" justifyContent="space-between" mt={2}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => setIsFilterVisible(false)} // Filter ausblenden, nach dem Anwenden
+              >
+                Filter anwenden
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={resetFilters}
+              >
+                Filter zurücksetzen
+              </Button>
+            </Box>
+          </Box>
+        )}
       </Paper>
 
       <Box marginTop={4}>
@@ -525,21 +665,35 @@ const App = () => {
           Transaktionen:
         </Typography>
         <Paper style={{ padding: "10px" }}>
-          {transactions.length > 0 ? (
-            transactions.map((trans, index) => {
+          {filteredTransactions.length > 0 ? (
+            filteredTransactions.map((trans) => {
+              console.log("Transaktion:", trans);
+              console.log("Gefilterte Transaktionen:", filteredTransactions);
               const isIncome = trans.type === "Einnahme";
               return (
-                <Box key={index} marginBottom={2}>
+                <Box
+                  key={trans.id}
+                  marginBottom={2}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
                   <Typography
                     variant="body1"
                     style={{
-                      color: isIncome ? "#4CAF50" : "#FF5733", // Grün für Einnahmen, Rot für Ausgaben
+                      color: isIncome ? "#4CAF50" : "#FF5733",
                       padding: "5px",
                       borderRadius: "4px",
                     }}
                   >
                     {trans.type} - {trans.amount} EUR - {trans.category}
                   </Typography>
+                  <IconButton
+                    color="secondary"
+                    onClick={() => handleDeleteTransaction(trans.id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
                 </Box>
               );
             })
@@ -550,15 +704,54 @@ const App = () => {
           )}
         </Paper>
       </Box>
+
+      {/* Diagramm */}
+      <Box marginTop={4}>
+        <Typography variant="h6" align="center" gutterBottom>
+          Finanzübersicht Diagramm
+        </Typography>
+        <Bar data={chartData} options={chartOptions} />
+      </Box>
+
+      {/* Bilanz-Anzeige */}
+      <Box marginTop={4}>
+        <Typography variant="h6" align="center" gutterBottom>
+          Bilanz
+        </Typography>
+        <Box display="flex" justifyContent="space-between" padding={2}>
+          <Typography variant="body1">Gesamte Einnahmen:</Typography>
+          <Typography variant="body1" style={{ color: "#4CAF50" }}>
+            {totalIncome} EUR
+          </Typography>
+        </Box>
+        <Box display="flex" justifyContent="space-between" padding={2}>
+          <Typography variant="body1">Gesamte Ausgaben:</Typography>
+          <Typography variant="body1" style={{ color: "#FF5733" }}>
+            {totalExpenses} EUR
+          </Typography>
+        </Box>
+        <Box display="flex" justifyContent="space-between" padding={2}>
+          <Typography variant="body1">Bilanz:</Typography>
+          <Typography
+            variant="body1"
+            style={{
+              color: totalBalance >= 0 ? "#4CAF50" : "#FF5733",
+              fontWeight: "bold",
+            }}
+          >
+            {totalBalance} EUR
+          </Typography>
+        </Box>
+      </Box>
+
       {/* Benutzer angezeigt, wenn eingeloggt */}
       <Box marginBottom={2}>
         <Typography variant="h6" align="center">
           Angemeldet als: {user}.
         </Typography>
       </Box>
+
       <Box marginBottom={5}>
-        {" "}
-        {/* Hier den Abstand zu den anderen Bereichen erhöhen */}
         {user && (
           <Box marginTop={4}>
             <Button

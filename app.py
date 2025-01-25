@@ -1,7 +1,7 @@
 import base64
 import logging
 import pyotp
-from flask import Flask, request, jsonify, send_file, redirect, url_for
+from flask import Flask, make_response, request, jsonify, send_file, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import bcrypt
@@ -226,20 +226,53 @@ def add_transaction():
 @app.route('/api/transactions', methods=['GET'])
 @jwt_required()
 def get_transactions():
-    user_email = get_jwt_identity()  # E-Mail des authentifizierten Benutzers
-    
-    transactions = Transaction.query.filter_by(user_email=user_email).all()
+    try:
+        user_email = get_jwt_identity()  # Extrahiert die E-Mail des Benutzers
+        print(f"Benutzer E-Mail aus JWT: {user_email}")
 
-    return jsonify([
-        {
-            "id": t.id,
-            "type": t.type,
-            "amount": t.amount,
-            "category": t.category,
-            "date": t.date,
-            "description": t.description
-        } for t in transactions
-    ])
+        # Überprüfe, ob der Benutzer in der Datenbank existiert
+        transactions = Transaction.query.filter_by(user_email=user_email).all()
+
+        if not transactions:
+            print("Keine Transaktionen gefunden.")  # Debugging
+            return jsonify({"message": "No transactions found"}), 404
+
+        return jsonify([
+            {
+                "id": t.id,
+                "type": t.type,
+                "amount": t.amount,
+                "category": t.category,
+                "date": t.date,
+                "description": t.description
+            } for t in transactions
+        ])
+
+    except Exception as e:
+        print(f"Fehler: {e}")
+        return jsonify({"message": "Fehler beim Abrufen der Transaktionen"}), 500
+
+
+@app.route('/api/transactions/<int:transaction_id>', methods=['DELETE'])
+@jwt_required()
+def delete_transaction(transaction_id):
+    try:
+        # Holen des Benutzers aus dem JWT
+        user_email = get_jwt_identity()
+
+        # Finden der Transaktion in der DB
+        transaction = Transaction.query.filter_by(id=transaction_id, user_email=user_email).first()
+        if not transaction:
+            return jsonify({"error": "Transaktion nicht gefunden."}), 404
+
+        # Löschen der Transaktion
+        db.session.delete(transaction)
+        db.session.commit()
+
+        return jsonify({"message": "Transaktion erfolgreich gelöscht."}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Fehler beim Löschen der Transaktion: {str(e)}"}), 500
 
     
 
