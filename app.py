@@ -9,6 +9,8 @@ from logging import FileHandler
 import qrcode
 from io import BytesIO
 from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
 
 
 # Flask-App initialisieren
@@ -42,6 +44,15 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     secret = db.Column(db.String(255), nullable=True)  # Für MFA geheimen Schlüssel
+
+class Transaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_email = db.Column(db.String(120), nullable=False)  # Benutzer-E-Mail
+    type = db.Column(db.String(50), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    date = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.String(255), nullable=True)
 
 # Datenbank erstellen
 with app.app_context():
@@ -125,7 +136,7 @@ def login():
                 return jsonify({"success": False, "mfaRequired": True, "message": "MFA erforderlich"})
 
             if verify_mfa_code(user.secret, mfa_code):  # Hier richtige Funktion verwenden
-                token = create_access_token(identity=user.email)
+                token = create_access_token(identity=user.email, expires_delta=False)
                 return jsonify({"success": True, "token": token})
             else:
                 return jsonify({"success": False, "message": "Ungültiger MFA-Code"}), 400
@@ -162,6 +173,74 @@ def verify_mfa():
         return jsonify({"success": True, "message": "MFA erfolgreich verifiziert!", "redirectUrl": url_for('dashboard')})
     else:
         return jsonify({"success": False, "message": "Ungültiger MFA-Code!"})
+    
+
+# Endpunkt: Transaktion speichern
+@app.route('/api/transactions', methods=['POST'])
+@jwt_required()
+def add_transaction():
+    try:
+        # Holen der E-Mail des Benutzers aus dem JWT
+        user_email = get_jwt_identity()
+        print(f"Aktueller Benutzer: {user_email}")  # Debugging: Log der E-Mail des Benutzers
+        
+        # Transaktionsdaten aus dem JSON extrahieren
+        data = request.get_json()
+        print(f"Empfangene Transaktionsdaten: {data}")  # Debugging: Log der empfangenen Transaktionsdaten
+
+        # Sicherstellen, dass die erforderlichen Felder vorhanden sind
+        required_fields = ['type', 'amount', 'category', 'date']
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            raise ValueError(f"Fehlende erforderliche Felder: {', '.join(missing_fields)}")
+
+        # Transaktion erstellen
+        new_transaction = Transaction(
+            user_email=user_email,  # E-Mail aus dem JWT verwenden
+            type=data['type'],
+            amount=data['amount'],
+            category=data['category'],
+            date=data['date'],
+            description=data.get('description', "")  # Beschreibung optional
+        )
+
+        # Transaktion in der DB speichern
+        db.session.add(new_transaction)
+        db.session.commit()
+
+        # Erfolgreiche Antwort
+        return jsonify({
+            "id": new_transaction.id,
+            "user_email": new_transaction.user_email,
+            "type": new_transaction.type,
+            "amount": new_transaction.amount,
+            "category": new_transaction.category,
+            "date": new_transaction.date,
+            "description": new_transaction.description
+        }), 201  # Statuscode 201 für erfolgreiches Erstellen
+        
+    except Exception as e:
+        print(f"Fehler beim Hinzufügen der Transaktion: {str(e)}")  # Detailierte Fehlerausgabe
+        return jsonify({"error": f"Fehler beim Speichern der Transaktion: {str(e)}"}), 500  # Fehlerbehandlung
+
+@app.route('/api/transactions', methods=['GET'])
+@jwt_required()
+def get_transactions():
+    user_email = get_jwt_identity()  # E-Mail des authentifizierten Benutzers
+    
+    transactions = Transaction.query.filter_by(user_email=user_email).all()
+
+    return jsonify([
+        {
+            "id": t.id,
+            "type": t.type,
+            "amount": t.amount,
+            "category": t.category,
+            "date": t.date,
+            "description": t.description
+        } for t in transactions
+    ])
+
     
 
 if __name__ == '__main__':

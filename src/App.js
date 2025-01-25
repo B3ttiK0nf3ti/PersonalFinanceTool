@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Container,
   TextField,
@@ -93,10 +93,14 @@ const AuthForm = ({ onLogin }) => {
           );
           setOpenSnackbar(true);
         } else {
-          localStorage.setItem("authToken", response.data.token);
+          localStorage.setItem("accessToken", response.data.token);
           localStorage.setItem("userEmail", formData.email); // E-Mail korrekt speichern
           onLogin(formData.email); // E-Mail als Argument übergeben
           console.log("E-Mail beim Absenden:", formData.email); // Debugging-Ausgabe
+          console.log(
+            "Gespeichertes Token:",
+            localStorage.getItem("accessToken")
+          );
         }
       } else {
         setSnackbarMessage(response.data.message || "Unbekannter Fehler");
@@ -211,7 +215,6 @@ const App = () => {
     date: "",
   });
   const [transactions, setTransactions] = useState([]);
-  const [budget, setBudget] = useState(500); // Budget-Feld
   const [filterCategory, setFilterCategory] = useState(""); // Filter für Kategorien
   const [filterPeriod, setFilterPeriod] = useState("7"); // Filter für Zeitraum (7 Tage, z.B.)
 
@@ -246,38 +249,105 @@ const App = () => {
     setTransaction({ ...transaction, [name]: value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleTransactionSubmit = async (e) => {
     e.preventDefault();
+
+    // Prüfen, ob alle Felder ausgefüllt sind
     if (!transaction.type || !transaction.amount || !transaction.category) {
       alert("Bitte alle Felder ausfüllen!");
       return;
     }
 
-    // Transaktionsdaten an den Server senden
+    // Zugriffstoken aus dem lokalen Speicher abrufen
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
+      alert("Sie müssen angemeldet sein, um eine Transaktion hinzuzufügen.");
+      return;
+    }
+
+    console.log("Gespeicherter Token:", accessToken);
+    console.log("Gesendete Transaktionsdaten:", {
+      type: transaction.type,
+      amount: transaction.amount,
+      category: transaction.category,
+      date: transaction.date,
+      description: transaction.description || "",
+    });
+
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:5000/api/transactions",
-        {
-          user_id: "user123", // Benutzer-ID hier setzen
-          amount: transaction.amount,
+      // API-Aufruf zum Speichern der Transaktion in der Datenbank
+      const response = await fetch("http://127.0.0.1:5000/api/transactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`, // Token für Authentifizierung
+        },
+        body: JSON.stringify({
           type: transaction.type,
+          amount: transaction.amount,
           category: transaction.category,
           date: transaction.date,
-        }
-      );
+          description: transaction.description || "", // Beschreibung optional
+        }),
+      });
 
-      if (response.data.success) {
-        // Erfolgreich gespeichert, Transaktion zur Anzeige hinzufügen
-        setTransactions([...transactions, transaction]);
-        setTransaction({ type: "", amount: "", category: "", date: "" });
-      } else {
-        alert("Fehler beim Speichern der Transaktion");
+      console.log("Antwortstatus:", response.status);
+
+      if (!response.ok) {
+        const responseData = await response.json();
+        console.log("Fehler bei der Antwort:", responseData); // Detaillierte Fehlerausgabe
+        throw new Error(
+          responseData.error || "Fehler beim Speichern der Transaktion."
+        );
       }
+
+      const responseData = await response.json();
+      console.log("Serverantwort:", responseData);
+
+      // Erfolgreiches Hinzufügen
+      setTransactions([...transactions, responseData]); // Hinzufügen zur Liste
+      setTransaction({
+        type: "",
+        amount: "",
+        category: "",
+        date: "",
+        description: "",
+      });
     } catch (error) {
-      console.error("Fehler beim Senden der Transaktion:", error);
-      alert("Fehler beim Speichern der Transaktion");
+      console.error("Fehler beim API-Aufruf:", error);
+      alert(
+        "Beim Speichern der Transaktion ist ein Fehler aufgetreten: " +
+          error.message
+      );
     }
   };
+
+  const fetchTransactions = async () => {
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) return;
+
+    try {
+      const response = await fetch("/api/transactions", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTransactions(data); // Transaktionen in den State setzen
+      } else {
+        console.error("Fehler beim Laden der Transaktionen.");
+      }
+    } catch (error) {
+      console.error("Fehler:", error);
+    }
+  };
+
+  // Aufruf der Funktion beim Laden der Seite
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
   // Filtern der Transaktionen nach Kategorie und Zeitraum
   const filteredTransactions = transactions.filter((trans) => {
@@ -319,21 +389,6 @@ const App = () => {
         {/* Filter-Bereich */}
         <Box mb={3} p={2} bgcolor="#f1f1f1" borderRadius={2}>
           <Grid container spacing={2} direction="column">
-            <Grid item>
-              <TextField
-                label="Budget"
-                variant="outlined"
-                fullWidth
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">€</InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-
             {/* Zeitraum-Filter */}
             <Grid item>
               <FormControl fullWidth>
@@ -366,7 +421,7 @@ const App = () => {
         </Box>
 
         {/* Transaktionseingabe */}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleTransactionSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <Typography variant="h6" align="center" gutterBottom>
