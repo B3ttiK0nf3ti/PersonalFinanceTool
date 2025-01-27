@@ -224,11 +224,80 @@ const App = () => {
   const [filterPeriod, setFilterPeriod] = useState(""); // Filter für Zeitraum (7 Tage, z.B.)
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
-  const totalIncome = transactions
+  const filteredTransactions = transactions.filter((trans) => {
+    const now = Date.now();
+    const withinPeriod = filterPeriod
+      ? new Date(trans.date).getTime() >=
+        now - parseInt(filterPeriod) * 24 * 60 * 60 * 1000
+      : true;
+
+    const byCategory =
+      filterCategory && filterCategory !== "Alle"
+        ? trans.category === filterCategory
+        : true;
+
+    console.log(
+      `Transaktion ${trans.id}: Zeitraum-Filter -> ${withinPeriod}, Kategorie-Filter -> ${byCategory}`
+    );
+
+    return withinPeriod && byCategory;
+  });
+
+  console.log("Gefilterte Transaktionen:", filteredTransactions);
+
+  const [inactivityTimer, setInactivityTimer] = useState(null);
+
+  useEffect(() => {
+    // Function to logout the user
+    const logout = () => {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userEmail");
+      setUser(null);
+      alert("You have been logged out due to inactivity.");
+    };
+
+    // Reset inactivity timer on user activity
+    const resetTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer); // Clear the previous timer
+      const timer = setTimeout(logout, 15 * 60 * 1000); // 15 minutes in milliseconds
+      setInactivityTimer(timer);
+    };
+
+    // Listen for activity events
+    const activityEvents = ["mousemove", "keydown", "click", "scroll"];
+    activityEvents.forEach((event) => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Cleanup listeners and timeout on component unmount
+    return () => {
+      activityEvents.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+    };
+  }, [inactivityTimer]);
+
+  // Handle page unload to logout
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userEmail");
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Cleanup on component unmount
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
+
+  const totalIncome = filteredTransactions
     .filter((trans) => trans.type === "Einnahme")
     .reduce((sum, trans) => sum + parseFloat(trans.amount), 0);
 
-  const totalExpenses = transactions
+  const totalExpenses = filteredTransactions
     .filter((trans) => trans.type === "Ausgabe")
     .reduce((sum, trans) => sum + parseFloat(trans.amount), 0);
 
@@ -259,6 +328,31 @@ const App = () => {
     "Kredite und Finanzierung",
     "Sonstiges",
   ];
+
+  const categoryColors = {
+    // Einnahmen-Kategorien
+    "Lohn/ Gehalt": "#673AB7", // Lila - kräftig und markant
+    "Einkünfte aus selbstständiger Tätigkeit – Unternehmerlohn": "#3F51B5", // Blau - vertrauensvoll und professionell
+    Förderungen: "#9C27B0", // Violett - kreativ und inspirierend
+    "Rente/ Pension": "#009688", // Teal - beruhigend und modern
+    "Staatliche Förderungen": "#2196F3", // Blau - kühl und professionell
+    Geldgeschenke: "#FF5722", // Korallenorange - lebendig und auffällig
+    "Dividenden/ Zinsen": "#607D8B", // Grau-Blau - dezent und ausbalanciert
+    "Sonstige Einnahmen": "#8D6E63", // Braun - warm und natürlich
+
+    // Ausgaben-Kategorien
+    Wohnen: "#00BCD4", // Cyan - frisch und kühl
+    Leben: "#FF4081", // Pink - lebendig und auffällig
+    "Gesundheit und Fürsorge": "#9E9D24", // Olive - zurückhaltend und erdig
+    "Hobbys, Freizeit und Sport": "#9E4D4D", // Ziegelrot - energisch und einladend
+    Mobilität: "#4CAF50", // Grün - beruhigend und ausgleichend
+    "Beruf/ Bildung": "#FF9800", // Orange - dynamisch und energisch
+    Tierhaltung: "#9C27B0", // Lila - sanft und kreativ
+    "Weitere Ausgabenarten": "#03A9F4", // Himmelblau - cool und einladend
+    "Versicherungen und Steuern": "#E91E63", // Magenta - kräftig und prägnant
+    "Kredite und Finanzierung": "#3F51B5", // Blau - seriös und ruhig
+    Sonstiges: "#8BC34A", // Pastellgrün - beruhigend und frisch
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -378,27 +472,6 @@ const App = () => {
     fetchTransactions();
   }, []);
 
-  const filteredTransactions = transactions.filter((trans) => {
-    const now = Date.now();
-    const withinPeriod = filterPeriod
-      ? new Date(trans.date).getTime() >=
-        now - parseInt(filterPeriod) * 24 * 60 * 60 * 1000
-      : true;
-
-    const byCategory =
-      filterCategory && filterCategory !== "Alle"
-        ? trans.category === filterCategory
-        : true;
-
-    console.log(
-      `Transaktion ${trans.id}: Zeitraum-Filter -> ${withinPeriod}, Kategorie-Filter -> ${byCategory}`
-    );
-
-    return withinPeriod && byCategory;
-  });
-
-  console.log("Gefilterte Transaktionen:", filteredTransactions);
-
   const resetFilters = () => {
     setFilterCategory(""); // Zurücksetzen der Kategorie
     setFilterPeriod(""); // Zurücksetzen des Zeitraums
@@ -406,17 +479,25 @@ const App = () => {
 
   // Chart-Daten vorbereiten
   const chartData = {
-    labels: ["Einnahmen", "Ausgaben"],
+    labels: ["Einnahmen", "Ausgaben"], // Beschriftungen der Balken
     datasets: [
       {
-        label: "Betrag in EUR",
-        data: [totalIncome, totalExpenses],
-        backgroundColor: ["#4CAF50", "#FF5733"],
-        borderColor: ["#4CAF50", "#FF5733"],
+        label: "Einnahmen", // Label für den Einnahmen-Balken
+        data: [totalIncome, 0], // Nur Einnahmen anzeigen
+        backgroundColor: "#4CAF50", // Grüner Balken für Einnahmen
+        borderColor: "#4CAF50", // Grüner Rand für Einnahmen
+        borderWidth: 1,
+      },
+      {
+        label: "Ausgaben", // Label für den Ausgaben-Balken
+        data: [0, totalExpenses], // Nur Ausgaben anzeigen
+        backgroundColor: "#FF5733", // Roter Balken für Ausgaben
+        borderColor: "#FF5733", // Roter Rand für Ausgaben
         borderWidth: 1,
       },
     ],
   };
+
   // Chart Optionen
   const chartOptions = {
     responsive: true,
@@ -431,6 +512,32 @@ const App = () => {
       },
     },
   };
+
+  const chartData2 = filteredTransactions.reduce(
+    (acc, trans) => {
+      const lastIncome =
+        acc.income.length > 0 ? acc.income[acc.income.length - 1] : 0;
+      const lastExpense =
+        acc.expense.length > 0 ? acc.expense[acc.expense.length - 1] : 0;
+
+      acc.income.push(
+        lastIncome + (trans.type === "Einnahme" ? trans.amount : 0)
+      );
+      acc.expense.push(
+        lastExpense + (trans.type === "Ausgabe" ? trans.amount : 0)
+      );
+
+      return acc;
+    },
+    { income: [], expense: [] }
+  );
+
+  // Kombiniere kumulierte Einnahmen und Ausgaben in chartData2
+  const chartData2Formatted = filteredTransactions.map((_, index) => ({
+    date: `Tag ${index + 1}`,
+    income: chartData2.income[index],
+    expense: chartData2.expense[index],
+  }));
 
   const handleDeleteTransaction = async (transactionId) => {
     const accessToken = localStorage.getItem("accessToken");
@@ -464,7 +571,7 @@ const App = () => {
 
   const handleLogin = (email) => {
     console.log("E-Mail in handleLogin:", email); // Debugging-Ausgabe
-    setUser(email); // E-Mail in den State setzen
+    setUser(email);
     localStorage.setItem("userEmail", email); // E-Mail im localStorage speichern
 
     // Rufe fetchTransactions direkt nach dem Login auf
@@ -474,11 +581,11 @@ const App = () => {
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("userEmail");
-    setUser(null); // E-Mail zurücksetzen
+    setUser(null); // Reset user state
   };
 
   if (!user) {
-    return <AuthForm onLogin={handleLogin} />; // Zeige AuthForm an, wenn nicht eingeloggt
+    return <AuthForm onLogin={handleLogin} />;
   }
 
   return (
@@ -532,7 +639,9 @@ const App = () => {
                 variant="outlined"
                 name="date"
                 type="date"
-                value={transaction.date}
+                value={
+                  transaction.date || new Date().toISOString().split("T")[0]
+                } // Setzt das heutige Datum als Standardwert
                 onChange={handleChange}
                 InputLabelProps={{
                   shrink: true,
@@ -670,6 +779,8 @@ const App = () => {
               console.log("Transaktion:", trans);
               console.log("Gefilterte Transaktionen:", filteredTransactions);
               const isIncome = trans.type === "Einnahme";
+              // Bestimme die Farbe basierend auf der Kategorie
+              const categoryColor = categoryColors[trans.category] || "#BDBDBD"; // Grau, falls keine Farbe definiert
               return (
                 <Box
                   key={trans.id}
@@ -688,6 +799,22 @@ const App = () => {
                   >
                     {trans.type} - {trans.amount} EUR - {trans.category}
                   </Typography>
+
+                  {/* Hier wird das bunte Kategorielabel hinzugefügt */}
+                  <Box
+                    style={{
+                      backgroundColor: categoryColor,
+                      color: "#fff",
+                      borderRadius: "12px",
+                      padding: "2px 8px",
+                      marginLeft: "auto", // Damit es rechts ausgerichtet wird
+                      fontSize: "12px",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {trans.category}
+                  </Box>
+
                   <IconButton
                     color="secondary"
                     onClick={() => handleDeleteTransaction(trans.id)}
@@ -711,6 +838,18 @@ const App = () => {
           Finanzübersicht Diagramm
         </Typography>
         <Bar data={chartData} options={chartOptions} />
+
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={chartData2Formatted}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="income" stroke="#4CAF50" />
+            <Line type="monotone" dataKey="expense" stroke="#FF5733" />
+          </LineChart>
+        </ResponsiveContainer>
       </Box>
 
       {/* Bilanz-Anzeige */}
