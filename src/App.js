@@ -33,6 +33,7 @@ import Autocomplete from "@mui/lab/Autocomplete";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { Bar } from "react-chartjs-2";
+import { parseISO, format, isValid } from "date-fns"; // Importiere isValid
 
 // Passwortvalidierung
 const passwordValidation = (password) => {
@@ -223,6 +224,19 @@ const App = () => {
   const [filterCategory, setFilterCategory] = useState(""); // Filter für Kategorien
   const [filterPeriod, setFilterPeriod] = useState(""); // Filter für Zeitraum (7 Tage, z.B.)
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+
+  const applyCustomFilter = () => {
+    if (filterPeriod === "custom" && customStartDate && customEndDate) {
+      // Logik zur Filterung der Daten basierend auf benutzerdefiniertem Zeitraum
+      console.log("Filtern von:", customStartDate, "bis", customEndDate);
+    } else {
+      // Standardzeitraum-Filter anwenden
+      console.log("Standardzeitraum-Filter:", filterPeriod);
+    }
+  };
 
   const filteredTransactions = transactions.filter((trans) => {
     const now = Date.now();
@@ -520,6 +534,7 @@ const App = () => {
       const lastExpense =
         acc.expense.length > 0 ? acc.expense[acc.expense.length - 1] : 0;
 
+      // Kumulierte Einnahmen und Ausgaben berechnen
       acc.income.push(
         lastIncome + (trans.type === "Einnahme" ? trans.amount : 0)
       );
@@ -532,12 +547,67 @@ const App = () => {
     { income: [], expense: [] }
   );
 
-  // Kombiniere kumulierte Einnahmen und Ausgaben in chartData2
-  const chartData2Formatted = filteredTransactions.map((_, index) => ({
-    date: `Tag ${index + 1}`,
-    income: chartData2.income[index],
-    expense: chartData2.expense[index],
-  }));
+  // Transaktionen nach Datum gruppieren und kumulieren
+  // Transaktionen nach Datum gruppieren und kumulieren
+  const groupedTransactions = filteredTransactions.reduce((acc, trans) => {
+    const date = trans.date; // Datum der Transaktion
+    const amount = trans.type === "Einnahme" ? trans.amount : -trans.amount; // Einnahme oder Ausgabe
+
+    // Wenn das Datum bereits im Accumulator vorhanden ist, füge die Menge hinzu
+    if (acc[date]) {
+      acc[date].income += trans.type === "Einnahme" ? trans.amount : 0;
+      acc[date].expense += trans.type === "Ausgabe" ? trans.amount : 0;
+    } else {
+      // Andernfalls erstelle einen neuen Eintrag für das Datum
+      acc[date] = {
+        income: trans.type === "Einnahme" ? trans.amount : 0,
+        expense: trans.type === "Ausgabe" ? trans.amount : 0,
+      };
+    }
+
+    return acc;
+  }, {});
+
+  // Sortiere die gruppierten Transaktionen nach Datum
+  const sortedGroupedTransactions = Object.keys(groupedTransactions)
+    .sort((a, b) => new Date(a) - new Date(b)) // Sortiere nach Datum
+    .map((date) => ({
+      date,
+      Einnahmen: groupedTransactions[date].income,
+      Ausgaben: groupedTransactions[date].expense,
+    }));
+
+  // Daten für das Diagramm vorbereiten
+  let cumulativeIncome = 0;
+  let cumulativeExpense = 0;
+
+  const chartData2Formatted = sortedGroupedTransactions.map((entry) => {
+    // Kumulierte Einnahmen und Ausgaben berechnen
+    cumulativeIncome += entry.Einnahmen;
+    cumulativeExpense += entry.Ausgaben;
+
+    // Debugging: Konsolenausgabe für jedes Datum
+    console.log(`Parsing date: ${entry.date}`);
+
+    // Datum parsen
+    const parsedDate = parseISO(entry.date);
+
+    // Prüfen, ob das Datum gültig ist
+    if (!isValid(parsedDate)) {
+      console.error(`Ungültiges Datum: ${entry.date}`); // Detaillierte Fehlermeldung
+      return {
+        date: "Invalid Date", // Fallback bei ungültigem Datum
+        Einnahmen: cumulativeIncome,
+        Ausgaben: cumulativeExpense,
+      };
+    }
+
+    return {
+      date: format(parsedDate, "dd.MM.yyyy"), // Datum im richtigen Format
+      Einnahmen: cumulativeIncome, // Kumulierte Einnahmen
+      Ausgaben: cumulativeExpense, // Kumulierte Ausgaben
+    };
+  });
 
   const handleDeleteTransaction = async (transactionId) => {
     const accessToken = localStorage.getItem("accessToken");
@@ -716,8 +786,8 @@ const App = () => {
 
         {/* Filter-Bereich */}
         {isFilterVisible && (
-          <Box mb={3} p={2} bgcolor="#f1f1f1" borderRadius={2}>
-            <Grid container spacing={2} direction="column">
+          <Box mb={3} p={3} bgcolor="#f1f1f1" borderRadius={2}>
+            <Grid container spacing={3} direction="column">
               {/* Zeitraum-Filter */}
               <Grid item>
                 <FormControl fullWidth>
@@ -730,9 +800,40 @@ const App = () => {
                     <MenuItem value="7">Letzte 7 Tage</MenuItem>
                     <MenuItem value="30">Letzte 30 Tage</MenuItem>
                     <MenuItem value="365">Letztes Jahr</MenuItem>
+                    <MenuItem value="custom">Benutzerdefiniert</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
+
+              {/* Benutzerdefinierter Zeitraum */}
+              {filterPeriod === "custom" && (
+                <Grid item>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="date"
+                        label="Startdatum"
+                        InputLabelProps={{ shrink: true }}
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="date"
+                        label="Enddatum"
+                        InputLabelProps={{ shrink: true }}
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                      />
+                    </Grid>
+                  </Grid>
+                </Grid>
+              )}
 
               {/* Kategorien-Filter */}
               <Grid item>
@@ -749,11 +850,14 @@ const App = () => {
             </Grid>
 
             {/* Filter anwenden und zurücksetzen Buttons horizontal ausgerichtet */}
-            <Box display="flex" justifyContent="space-between" mt={2}>
+            <Box display="flex" justifyContent="space-between" mt={3}>
               <Button
                 variant="contained"
                 color="primary"
-                onClick={() => setIsFilterVisible(false)} // Filter ausblenden, nach dem Anwenden
+                onClick={() => {
+                  setIsFilterVisible(false); // Filter ausblenden, nach dem Anwenden
+                  applyCustomFilter(); // Filter anwenden
+                }}
               >
                 Filter anwenden
               </Button>
@@ -770,8 +874,8 @@ const App = () => {
       </Paper>
 
       <Box marginTop={4}>
-        <Typography variant="h6" gutterBottom>
-          Transaktionen:
+        <Typography variant="h6" align="center" margin={4} gutterBottom>
+          Transaktionen{" "}
         </Typography>
         <Paper style={{ padding: "10px" }}>
           {filteredTransactions.length > 0 ? (
@@ -834,11 +938,14 @@ const App = () => {
 
       {/* Diagramm */}
       <Box marginTop={4}>
-        <Typography variant="h6" align="center" gutterBottom>
-          Finanzübersicht Diagramm
+        <Typography variant="h6" align="center" margin={4} gutterBottom>
+          Finanzübersicht Balkendiagramm
         </Typography>
         <Bar data={chartData} options={chartOptions} />
 
+        <Typography variant="h6" align="center" margin={4} gutterBottom>
+          Finanzübersicht Liniendiagramm
+        </Typography>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData2Formatted}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -846,16 +953,16 @@ const App = () => {
             <YAxis />
             <Tooltip />
             <Legend />
-            <Line type="monotone" dataKey="income" stroke="#4CAF50" />
-            <Line type="monotone" dataKey="expense" stroke="#FF5733" />
+            <Line type="monotone" dataKey="Einnahmen" stroke="#4CAF50" />
+            <Line type="monotone" dataKey="Ausgaben" stroke="#FF5733" />
           </LineChart>
         </ResponsiveContainer>
       </Box>
 
       {/* Bilanz-Anzeige */}
       <Box marginTop={4}>
-        <Typography variant="h6" align="center" gutterBottom>
-          Bilanz
+        <Typography variant="h6" align="center" margin={4} gutterBottom>
+          Bilanz{" "}
         </Typography>
         <Box display="flex" justifyContent="space-between" padding={2}>
           <Typography variant="body1">Gesamte Einnahmen:</Typography>
@@ -884,8 +991,12 @@ const App = () => {
       </Box>
 
       {/* Benutzer angezeigt, wenn eingeloggt */}
-      <Box marginBottom={2}>
-        <Typography variant="h6" align="center">
+      <Box marginBottom={2} marginTop={4}>
+        <Typography
+          variant="body2"
+          align="center"
+          style={{ fontSize: "smaller" }}
+        >
           Angemeldet als: {user}.
         </Typography>
       </Box>
