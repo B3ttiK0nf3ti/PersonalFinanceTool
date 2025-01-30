@@ -467,11 +467,11 @@ const App = () => {
       category: transaction.category,
       date: transaction.date,
       description: transaction.description || "",
-      isRecurring: transaction.isRecurring || false, // Sicherstellen, dass das Feld gesetzt ist
-      recurrenceType: transaction.recurrenceType || null, // Falls vorhanden
+      isRecurring: transaction.isRecurring, // Hier sicherstellen, dass es ein Boolean ist
+      recurrenceType: transaction.recurrenceType || null,
       nextDueDate: transaction.isRecurring
         ? calculateNextDueDate(transaction.date, transaction.recurrenceType)
-        : null, // Berechnen oder null setzen
+        : null,
     };
 
     try {
@@ -854,13 +854,9 @@ const App = () => {
                   transaction.date || new Date().toISOString().split("T")[0]
                 }
                 onChange={handleChange}
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                InputLabelProps={{ shrink: true }}
                 required
-                inputProps={{
-                  max: new Date().toISOString().split("T")[0], // Setzt das maximale Datum auf heute
-                }}
+                inputProps={{ max: new Date().toISOString().split("T")[0] }} // Setzt das maximale Datum auf heute
               />
             </Grid>
 
@@ -874,9 +870,7 @@ const App = () => {
                 type="number"
                 value={transaction.amount}
                 onChange={handleChange}
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                InputLabelProps={{ shrink: true }}
                 required
               />
             </Grid>
@@ -897,9 +891,7 @@ const App = () => {
                 renderInput={(params) => (
                   <TextField {...params} label="Kategorie" required />
                 )}
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                InputLabelProps={{ shrink: true }}
                 required
               />
             </Grid>
@@ -942,10 +934,10 @@ const App = () => {
             </Grid>
 
             {/* Wiederholungsfrequenz (wenn wiederkehrend "Ja") */}
-            {transaction.isRecurring && (
-              <Grid item xs={4}>
-                <Grid container direction="column" spacing={2}>
-                  <Grid item>
+            <Grid item xs={6}>
+              <Grid container direction="column" spacing={2}>
+                {transaction.isRecurring && (
+                  <Grid item xs={12}>
                     <Autocomplete
                       fullWidth
                       value={transaction.recurrenceType}
@@ -970,21 +962,21 @@ const App = () => {
                       )}
                     />
                   </Grid>
+                )}
 
-                  {/* Hinzufügen Button */}
-                  <Grid item>
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      color="primary"
-                      fullWidth
-                    >
-                      Hinzufügen
-                    </Button>
-                  </Grid>
+                {/* Hinzufügen Button (immer sichtbar) */}
+                <Grid item xs={12}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                  >
+                    Hinzufügen
+                  </Button>
                 </Grid>
               </Grid>
-            )}
+            </Grid>
           </Grid>
         </form>
 
@@ -1148,6 +1140,8 @@ const App = () => {
                           ))}
                       </TableSortLabel>
                     </TableCell>
+                    <TableCell>Wiederkehrend</TableCell>{" "}
+                    {/* Neue Spalte für Wiederkehrend */}
                     <TableCell>Aktionen</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1162,6 +1156,10 @@ const App = () => {
                         <TableCell>{trans.category}</TableCell>
                         <TableCell>{trans.type}</TableCell>
                         <TableCell>
+                          {trans.isRecurring ? "Ja" : "Nein"}{" "}
+                          {/* Anzeige von Ja/Nein für Wiederkehrend */}
+                        </TableCell>
+                        <TableCell>
                           <IconButton
                             color="secondary"
                             onClick={() => handleDeleteTransaction(trans.id)}
@@ -1173,7 +1171,9 @@ const App = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center">
+                        {" "}
+                        {/* ColSpan auf 6 setzen, weil eine neue Spalte hinzugefügt wurde */}
                         Keine Transaktionen gefunden.
                       </TableCell>
                     </TableRow>

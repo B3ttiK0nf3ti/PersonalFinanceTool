@@ -206,7 +206,7 @@ def add_transaction():
             category=data['category'],
             date=data['date'],
             description=data.get('description', ""), # Beschreibung optional
-            is_recurring = 1 if data['is_recurring'] else 0,
+            is_recurring = 1 if data.get('is_recurring', False) else 0,
             recurrence_type=data.get('recurrence_type')
         )
 
