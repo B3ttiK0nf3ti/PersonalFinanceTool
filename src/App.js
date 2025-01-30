@@ -359,7 +359,7 @@ const App = () => {
     Leben: "#FF4081", // Pink - lebendig und auffällig
     "Gesundheit und Fürsorge": "#9E9D24", // Olive - zurückhaltend und erdig
     "Hobbys, Freizeit und Sport": "#9E4D4D", // Ziegelrot - energisch und einladend
-    Mobilität: "#4CAF50", // Grün - beruhigend und ausgleichend
+    Mobilität: "#90EE90", // Grün - beruhigend und ausgleichend
     "Beruf/ Bildung": "#FF9800", // Orange - dynamisch und energisch
     Tierhaltung: "#9C27B0", // Lila - sanft und kreativ
     "Weitere Ausgabenarten": "#03A9F4", // Himmelblau - cool und einladend
@@ -493,20 +493,27 @@ const App = () => {
 
   // Chart-Daten vorbereiten
   const chartData = {
-    labels: ["Einnahmen", "Ausgaben"], // Beschriftungen der Balken
+    labels: ["Einnahmen", "Ausgaben", "Differenz"], // Beschriftungen der Balken
     datasets: [
       {
         label: "Einnahmen", // Label für den Einnahmen-Balken
-        data: [totalIncome, 0], // Nur Einnahmen anzeigen
-        backgroundColor: "#4CAF50", // Grüner Balken für Einnahmen
-        borderColor: "#4CAF50", // Grüner Rand für Einnahmen
+        data: [totalIncome, 0, 0], // Nur Einnahmen anzeigen
+        backgroundColor: "#90EE90", // Grüner Balken für Einnahmen
+        borderColor: "#90EE90", // Grüner Rand für Einnahmen
         borderWidth: 1,
       },
       {
         label: "Ausgaben", // Label für den Ausgaben-Balken
-        data: [0, totalExpenses], // Nur Ausgaben anzeigen
+        data: [0, totalExpenses, 0], // Nur Ausgaben anzeigen
         backgroundColor: "#FF5733", // Roter Balken für Ausgaben
         borderColor: "#FF5733", // Roter Rand für Ausgaben
+        borderWidth: 1,
+      },
+      {
+        label: "Differenz", // Label für den Ausgaben-Balken
+        data: [0, 0, totalBalance], // Nur Ausgaben anzeigen
+        backgroundColor: "#87CEFA", // Roter Balken für Ausgaben
+        borderColor: "#87CEFA", // Roter Rand für Ausgaben
         borderWidth: 1,
       },
     ],
@@ -547,7 +554,6 @@ const App = () => {
     { income: [], expense: [] }
   );
 
-  // Transaktionen nach Datum gruppieren und kumulieren
   // Transaktionen nach Datum gruppieren und kumulieren
   const groupedTransactions = filteredTransactions.reduce((acc, trans) => {
     const date = trans.date; // Datum der Transaktion
@@ -896,7 +902,7 @@ const App = () => {
                   <Typography
                     variant="body1"
                     style={{
-                      color: isIncome ? "#4CAF50" : "#FF5733",
+                      color: isIncome ? "#90EE90" : "#FF5733",
                       padding: "5px",
                       borderRadius: "4px",
                     }}
@@ -953,7 +959,7 @@ const App = () => {
             <YAxis />
             <Tooltip />
             <Legend />
-            <Line type="monotone" dataKey="Einnahmen" stroke="#4CAF50" />
+            <Line type="monotone" dataKey="Einnahmen" stroke="#90EE90" />
             <Line type="monotone" dataKey="Ausgaben" stroke="#FF5733" />
           </LineChart>
         </ResponsiveContainer>
@@ -966,7 +972,7 @@ const App = () => {
         </Typography>
         <Box display="flex" justifyContent="space-between" padding={2}>
           <Typography variant="body1">Gesamte Einnahmen:</Typography>
-          <Typography variant="body1" style={{ color: "#4CAF50" }}>
+          <Typography variant="body1" style={{ color: "#90EE90" }}>
             {totalIncome} EUR
           </Typography>
         </Box>
@@ -981,7 +987,7 @@ const App = () => {
           <Typography
             variant="body1"
             style={{
-              color: totalBalance >= 0 ? "#4CAF50" : "#FF5733",
+              color: totalBalance >= 0 ? "#90EE90" : "#FF5733",
               fontWeight: "bold",
             }}
           >
