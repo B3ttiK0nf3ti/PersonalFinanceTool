@@ -53,6 +53,10 @@ class Transaction(db.Model):
     category = db.Column(db.String(50), nullable=False)
     date = db.Column(db.String(50), nullable=False)
     description = db.Column(db.String(255), nullable=True)
+    
+    # Neue Felder für wiederkehrende Transaktionen
+    is_recurring = db.Column(db.Integer, nullable=False, default=0)  # 0 bedeutet false, 1 bedeutet true
+    recurrence_type = db.Column(db.String(50), nullable=True)
 
 # Datenbank erstellen
 with app.app_context():
@@ -201,7 +205,9 @@ def add_transaction():
             amount=data['amount'],
             category=data['category'],
             date=data['date'],
-            description=data.get('description', "")  # Beschreibung optional
+            description=data.get('description', ""), # Beschreibung optional
+            is_recurring = 1 if data['is_recurring'] else 0,
+            recurrence_type=data.get('recurrence_type')
         )
 
         # Transaktion in der DB speichern

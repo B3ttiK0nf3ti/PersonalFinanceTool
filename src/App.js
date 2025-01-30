@@ -801,7 +801,12 @@ const App = () => {
 
         {/* Transaktionseingabe */}
         <form onSubmit={handleTransactionSubmit}>
-          <Grid container spacing={2}>
+          <Grid
+            container
+            spacing={2}
+            justifyContent="center"
+            alignItems="center"
+          >
             {/* Transaktionstyp Auswahl */}
             <Grid item xs={12}>
               <Typography variant="h6" align="center" gutterBottom>
@@ -838,7 +843,7 @@ const App = () => {
             </Grid>
 
             {/* Datum Eingabe */}
-            <Grid item xs={12}>
+            <Grid item xs={8} sm={6} md={4}>
               <TextField
                 fullWidth
                 label="Datum"
@@ -853,11 +858,14 @@ const App = () => {
                   shrink: true,
                 }}
                 required
+                inputProps={{
+                  max: new Date().toISOString().split("T")[0], // Setzt das maximale Datum auf heute
+                }}
               />
             </Grid>
 
             {/* Betrag Eingabe */}
-            <Grid item xs={12}>
+            <Grid item xs={8} sm={6} md={4}>
               <TextField
                 fullWidth
                 label="Betrag"
@@ -874,7 +882,7 @@ const App = () => {
             </Grid>
 
             {/* Kategorie Auswahl */}
-            <Grid item xs={12}>
+            <Grid item xs={8} sm={6} md={4}>
               <Autocomplete
                 fullWidth
                 value={transaction.category}
@@ -923,7 +931,7 @@ const App = () => {
                       setTransaction({
                         ...transaction,
                         isRecurring: false,
-                        recurrenceType: "",
+                        recurrenceType: "", // Setzt das Wiederholungsintervall zurück, wenn "Nein" ausgewählt
                       })
                     }
                   >
@@ -934,52 +942,54 @@ const App = () => {
             </Grid>
 
             {/* Wiederholungsfrequenz (wenn wiederkehrend "Ja") */}
-            {transaction.isRecurring &&
-              (transaction.type === "Einnahme" ||
-                transaction.type === "Ausgabe") && (
-                <Grid item xs={12}>
-                  <Autocomplete
-                    fullWidth
-                    value={transaction.recurrenceType}
-                    onChange={(event, newValue) =>
-                      setTransaction({
-                        ...transaction,
-                        recurrenceType: newValue,
-                      })
-                    }
-                    options={[
-                      "Wöchentlich",
-                      "Monatlich",
-                      "Quartal",
-                      "Jährlich",
-                    ]}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Wiederholungsintervall"
-                        required
-                      />
-                    )}
-                  />
-                </Grid>
-              )}
+            {transaction.isRecurring && (
+              <Grid item xs={4}>
+                <Grid container direction="column" spacing={2}>
+                  <Grid item>
+                    <Autocomplete
+                      fullWidth
+                      value={transaction.recurrenceType}
+                      onChange={(event, newValue) =>
+                        setTransaction({
+                          ...transaction,
+                          recurrenceType: newValue,
+                        })
+                      }
+                      options={[
+                        "Wöchentlich",
+                        "Monatlich",
+                        "Quartal",
+                        "Jährlich",
+                      ]}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Wiederholungsintervall"
+                          required
+                        />
+                      )}
+                    />
+                  </Grid>
 
-            {/* Hinzufügen Button */}
-            <Grid item xs={12}>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                fullWidth
-              >
-                Hinzufügen
-              </Button>
-            </Grid>
+                  {/* Hinzufügen Button */}
+                  <Grid item>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      color="primary"
+                      fullWidth
+                    >
+                      Hinzufügen
+                    </Button>
+                  </Grid>
+                </Grid>
+              </Grid>
+            )}
           </Grid>
         </form>
 
         {/* Filtersymbol hinzufügen */}
-        <Box mb={3}>
+        <Box mb={3} display="flex" alignItems="center">
           <IconButton
             onClick={() => setIsFilterVisible(!isFilterVisible)}
             color="primary"
@@ -1016,7 +1026,7 @@ const App = () => {
               {filterPeriod === "custom" && (
                 <Grid item>
                   <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
+                    <Grid item xs={8} sm={6}>
                       <TextField
                         fullWidth
                         variant="outlined"
@@ -1027,7 +1037,7 @@ const App = () => {
                         onChange={(e) => setCustomStartDate(e.target.value)}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid item xs={8} sm={6}>
                       <TextField
                         fullWidth
                         variant="outlined"
@@ -1087,10 +1097,6 @@ const App = () => {
 
         <Container maxWidth="md" style={{ marginTop: "50px" }}>
           <Paper style={{ padding: "20px" }}>
-            <Typography variant="h4" align="center" gutterBottom>
-              Finanzübersicht
-            </Typography>
-
             {/* Tabelle mit Transaktionen */}
             <TableContainer component={Paper}>
               <Table>
