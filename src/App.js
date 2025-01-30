@@ -52,6 +52,10 @@ const passwordValidation = (password) => {
   return regex.test(password);
 };
 
+const formatNumber = (number) => {
+  return new Intl.NumberFormat("de-DE").format(number); // 'de-DE' für deutsche Formatierung
+};
+
 const AuthForm = ({ onLogin }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [formData, setFormData] = useState({
@@ -655,6 +659,16 @@ const App = () => {
     scales: {
       y: {
         beginAtZero: true,
+        ticks: {
+          // Hier wird die Formatierung für die Y-Achse festgelegt
+          callback: function (value) {
+            return new Intl.NumberFormat("de-DE", {
+              style: "decimal",
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2,
+            }).format(value); // Formatierung der Zahl mit Tausendertrennzeichen und zwei Dezimalstellen
+          },
+        },
       },
     },
   };
@@ -1161,7 +1175,9 @@ const App = () => {
                           <TableCell>
                             {new Date(trans.date).toLocaleDateString()}
                           </TableCell>
-                          <TableCell>{trans.amount} EUR</TableCell>
+                          <TableCell>
+                            {formatNumber(trans.amount)} EUR
+                          </TableCell>
                           <TableCell>{trans.category}</TableCell>
                           <TableCell>{trans.type}</TableCell>
                           <TableCell>
@@ -1207,8 +1223,16 @@ const App = () => {
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData2Formatted}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
+            <XAxis dataKey="date" tick={{ dy: 10 }} />
+            <YAxis
+              tickFormatter={(value) =>
+                new Intl.NumberFormat("de-DE", {
+                  style: "decimal",
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 2,
+                }).format(value)
+              }
+            />
             <Tooltip />
             <Legend />
             <Line type="monotone" dataKey="Einnahmen" stroke="#90EE90" />
@@ -1225,13 +1249,13 @@ const App = () => {
         <Box display="flex" justifyContent="space-between" padding={2}>
           <Typography variant="body1">Gesamte Einnahmen:</Typography>
           <Typography variant="body1" style={{ color: "#90EE90" }}>
-            {totalIncome} EUR
+            {formatNumber(totalIncome)} EUR
           </Typography>
         </Box>
         <Box display="flex" justifyContent="space-between" padding={2}>
           <Typography variant="body1">Gesamte Ausgaben:</Typography>
           <Typography variant="body1" style={{ color: "#FF5733" }}>
-            {totalExpenses} EUR
+            {formatNumber(totalExpenses)} EUR
           </Typography>
         </Box>
         <Box display="flex" justifyContent="space-between" padding={2}>
@@ -1243,7 +1267,7 @@ const App = () => {
               fontWeight: "bold",
             }}
           >
-            {totalBalance} EUR
+            {formatNumber(totalBalance)} EUR
           </Typography>
         </Box>
       </Box>
