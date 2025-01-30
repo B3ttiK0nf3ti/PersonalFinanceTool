@@ -10,6 +10,8 @@ import qrcode
 from io import BytesIO
 from flask_jwt_extended import JWTManager, create_access_token
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from datetime import datetime, timedelta
+import calendar
 
 
 
@@ -53,10 +55,9 @@ class Transaction(db.Model):
     category = db.Column(db.String(50), nullable=False)
     date = db.Column(db.String(50), nullable=False)
     description = db.Column(db.String(255), nullable=True)
-    
-    # Neue Felder für wiederkehrende Transaktionen
     is_recurring = db.Column(db.Integer, nullable=False, default=0)  # 0 bedeutet false, 1 bedeutet true
     recurrence_type = db.Column(db.String(50), nullable=True)
+    next_due_date = db.Column(db.String(50), nullable=True)
 
 # Datenbank erstellen
 with app.app_context():
@@ -73,6 +74,36 @@ def is_strong_password(password):
     if not any(char in "!@#$%^&*()_+" for char in password):
         return False
     return True
+
+def calculate_next_due_date(start_date, recurrence_type):
+    # Startdatum in datetime-Objekt umwandeln
+    start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
+
+    if recurrence_type == 'Wöchentlich':
+        # 7 Tage zu dem Startdatum hinzufügen
+        next_due_date = start_date_obj + timedelta(weeks=1)
+    elif recurrence_type == 'Monatlich':
+        # Einen Monat zum Startdatum hinzufügen
+        next_month = start_date_obj.month % 12 + 1
+        next_year = start_date_obj.year + (start_date_obj.month // 12)
+        day = min(start_date_obj.day, calendar.monthrange(next_year, next_month)[1])
+        next_due_date = start_date_obj.replace(year=next_year, month=next_month, day=day)
+    elif recurrence_type == 'Quartal':
+        # Drei Monate zum Startdatum hinzufügen
+        next_month = (start_date_obj.month + 3) % 12
+        next_year = start_date_obj.year + ((start_date_obj.month + 3) // 12)
+        day = min(start_date_obj.day, calendar.monthrange(next_year, next_month)[1])
+        next_due_date = start_date_obj.replace(year=next_year, month=next_month, day=day)
+    else:
+        # Keine Wiederholung (oder unbekannter Typ), keine Änderung des Datums
+        next_due_date = None
+
+    if next_due_date:
+        print(f"Berechnetes nächstes Fälligkeitsdatum: {next_due_date}")
+    else:
+        print(f"Kein nächstes Fälligkeitsdatum aufgrund des Typs: {recurrence_type}")
+
+    return next_due_date
 
 # Endpunkt: Benutzer registrieren
 @app.route('/register', methods=['POST'])
@@ -179,7 +210,6 @@ def verify_mfa():
         return jsonify({"success": False, "message": "Ungültiger MFA-Code!"})
     
 
-# Endpunkt: Transaktion speichern
 @app.route('/api/transactions', methods=['POST'])
 @jwt_required()
 def add_transaction():
@@ -190,13 +220,38 @@ def add_transaction():
         
         # Transaktionsdaten aus dem JSON extrahieren
         data = request.get_json()
-        print(f"Empfangene Transaktionsdaten: {data}")  # Debugging: Log der empfangenen Transaktionsdaten
-
+        print(f"Empfangene Transaktionsdaten: {data}")
+        
         # Sicherstellen, dass die erforderlichen Felder vorhanden sind
         required_fields = ['type', 'amount', 'category', 'date']
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
             raise ValueError(f"Fehlende erforderliche Felder: {', '.join(missing_fields)}")
+        
+        # Das Datum vor der Verarbeitung debuggen
+        transaction_date_str = data['date'].strip()  # Entfernen von Leerzeichen, falls vorhanden
+        print(f"Parsing Datum: {transaction_date_str}")
+
+        # Überprüfen, ob das Datum im richtigen Format ist
+        try:
+            transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "Das angegebene Datum ist ungültig. Bitte das Datum im Format 'YYYY-MM-DD' eingeben."}), 400
+
+        # Umwandeln des Datums in einen Unix-Zeitstempel (falls vorhanden)
+        next_due_date = data.get('nextDueDate', None)
+        if not next_due_date and data.get('isRecurring', False):
+            # Berechne das nextDueDate, wenn es nicht angegeben wurde und die Transaktion wiederkehrend ist
+            next_due_date = calculate_next_due_date(data['date'], data['recurrenceType'])
+            
+            # Wenn next_due_date berechnet wurde, formatiere es im Format 'YYYY-MM-DD'
+            if next_due_date:
+                next_due_date = next_due_date.strftime('%Y-%m-%d')
+        
+        print(f"Berechnetes Next Due Date: {next_due_date}")
+
+        # Sicherstellen, dass 'isRecurring' korrekt gesetzt ist (1 für Ja, 0 für Nein)
+        is_recurring = 1 if data.get('isRecurring', False) else 0
 
         # Transaktion erstellen
         new_transaction = Transaction(
@@ -205,9 +260,10 @@ def add_transaction():
             amount=data['amount'],
             category=data['category'],
             date=data['date'],
-            description=data.get('description', ""), # Beschreibung optional
-            is_recurring = 1 if data.get('is_recurring', False) else 0,
-            recurrence_type=data.get('recurrence_type')
+            description=data.get('description', ""),
+            is_recurring=is_recurring,  # Verwende den Wert 1 oder 0
+            recurrence_type=data.get('recurrenceType', None),
+            next_due_date=next_due_date  # Berechnetes next_due_date im Format 'YYYY-MM-DD'
         )
 
         # Transaktion in der DB speichern
@@ -222,25 +278,27 @@ def add_transaction():
             "amount": new_transaction.amount,
             "category": new_transaction.category,
             "date": new_transaction.date,
-            "description": new_transaction.description
+            "description": new_transaction.description,
+            "next_due_date": new_transaction.next_due_date
         }), 201  # Statuscode 201 für erfolgreiches Erstellen
         
     except Exception as e:
         print(f"Fehler beim Hinzufügen der Transaktion: {str(e)}")  # Detailierte Fehlerausgabe
         return jsonify({"error": f"Fehler beim Speichern der Transaktion: {str(e)}"}), 500  # Fehlerbehandlung
 
+
+
 @app.route('/api/transactions', methods=['GET'])
 @jwt_required()
 def get_transactions():
     try:
-        user_email = get_jwt_identity()  # Extrahiert die E-Mail des Benutzers
+        user_email = get_jwt_identity()
         print(f"Benutzer E-Mail aus JWT: {user_email}")
 
-        # Überprüfe, ob der Benutzer in der Datenbank existiert
         transactions = Transaction.query.filter_by(user_email=user_email).all()
-
+        
         if not transactions:
-            print("Keine Transaktionen gefunden.")  # Debugging
+            print("Keine Transaktionen gefunden.")
             return jsonify({"message": "No transactions found"}), 404
 
         return jsonify([
@@ -250,7 +308,9 @@ def get_transactions():
                 "amount": t.amount,
                 "category": t.category,
                 "date": t.date,
-                "description": t.description
+                "description": t.description,
+                "isRecurring": t.is_recurring,  # Hier wird is_recurring übertragen
+                "recurrenceType": t.recurrence_type
             } for t in transactions
         ])
 

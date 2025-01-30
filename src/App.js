@@ -467,12 +467,14 @@ const App = () => {
       category: transaction.category,
       date: transaction.date,
       description: transaction.description || "",
-      isRecurring: transaction.isRecurring, // Hier sicherstellen, dass es ein Boolean ist
+      isRecurring: JSON.parse(transaction.isRecurring || "false"), // Hier sicherstellen, dass es ein Boolean ist
       recurrenceType: transaction.recurrenceType || null,
       nextDueDate: transaction.isRecurring
         ? calculateNextDueDate(transaction.date, transaction.recurrenceType)
         : null,
     };
+    console.log("isRecurring in transactionData:", transactionData.isRecurring);
+    console.log("Final transactionData vor dem API-Call:", transactionData);
 
     try {
       const response = await fetch("http://127.0.0.1:5000/api/transactions", {
@@ -486,11 +488,13 @@ const App = () => {
 
       if (!response.ok) {
         const responseData = await response.json();
+        console.log("API Response nach POST:", responseData);
         console.error("Fehler bei der Antwort:", responseData);
         throw new Error(responseData.error || "Fehler beim Speichern.");
       }
 
       const responseData = await response.json();
+      console.log("API Response nach POST:", responseData);
       setTransactions([...transactions, responseData]);
 
       // Formular zurücksetzen
@@ -588,21 +592,14 @@ const App = () => {
         },
       });
 
-      // Logge die Antwort vor der Verarbeitung
-      const textResponse = await response.text(); // Antwort als Text lesen
-      console.log("Antwort vom Server:", textResponse);
-
       // Überprüfe, ob die Antwort JSON ist, bevor du versuchst, sie zu parsen
       if (response.ok) {
-        try {
-          const data = JSON.parse(textResponse); // Manuelles Parsen
-          console.log("Transaktionen:", data);
-          setTransactions(data); // Alle Transaktionen setzen
-        } catch (e) {
-          console.error("Fehler beim Parsen der JSON-Antwort:", e);
-        }
+        const data = await response.json(); // Direkt als JSON parsen
+        console.log("Antwort vom Server als JSON:", data);
+        setTransactions(data); // Setze die Transaktionen im State
       } else {
-        console.error("Fehler beim Abrufen der Transaktionen:", textResponse);
+        const errorText = await response.text(); // Fehler als Text lesen
+        console.error("Fehler beim Abrufen der Transaktionen:", errorText);
       }
     } catch (error) {
       console.error("Fehler:", error);
@@ -906,9 +903,13 @@ const App = () => {
                   <Button
                     variant={transaction.isRecurring ? "contained" : "outlined"}
                     color="primary"
-                    onClick={() =>
-                      setTransaction({ ...transaction, isRecurring: true })
-                    }
+                    onClick={() => {
+                      setTransaction({ ...transaction, isRecurring: true });
+                      console.log(
+                        "Aktualisierter Wert für isRecurring (Ja):",
+                        transaction.isRecurring
+                      );
+                    }}
                   >
                     Ja
                   </Button>
@@ -1147,33 +1148,41 @@ const App = () => {
                 </TableHead>
                 <TableBody>
                   {sortedAndFilteredTransactions.length > 0 ? (
-                    sortedAndFilteredTransactions.map((trans) => (
-                      <TableRow key={trans.id}>
-                        <TableCell>
-                          {new Date(trans.date).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>{trans.amount} EUR</TableCell>
-                        <TableCell>{trans.category}</TableCell>
-                        <TableCell>{trans.type}</TableCell>
-                        <TableCell>
-                          {trans.isRecurring ? "Ja" : "Nein"}{" "}
-                          {/* Anzeige von Ja/Nein für Wiederkehrend */}
-                        </TableCell>
-                        <TableCell>
-                          <IconButton
-                            color="secondary"
-                            onClick={() => handleDeleteTransaction(trans.id)}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    sortedAndFilteredTransactions.map((trans) => {
+                      // Log für isRecurring und andere relevante Daten
+                      console.log("Transaktion ID:", trans.id);
+                      console.log(
+                        "isRecurring für Transaktion:",
+                        trans.isRecurring
+                      );
+
+                      return (
+                        <TableRow key={trans.id}>
+                          <TableCell>
+                            {new Date(trans.date).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>{trans.amount} EUR</TableCell>
+                          <TableCell>{trans.category}</TableCell>
+                          <TableCell>{trans.type}</TableCell>
+                          <TableCell>
+                            {/* Log vor der Anzeige von "Ja" oder "Nein" */}
+
+                            {trans.isRecurring === 1 ? "Ja" : "Nein"}
+                          </TableCell>
+                          <TableCell>
+                            <IconButton
+                              color="secondary"
+                              onClick={() => handleDeleteTransaction(trans.id)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} align="center">
-                        {" "}
-                        {/* ColSpan auf 6 setzen, weil eine neue Spalte hinzugefügt wurde */}
                         Keine Transaktionen gefunden.
                       </TableCell>
                     </TableRow>
