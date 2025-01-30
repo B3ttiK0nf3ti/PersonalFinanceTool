@@ -34,6 +34,16 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { Bar } from "react-chartjs-2";
 import { parseISO, format, isValid } from "date-fns"; // Importiere isValid
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TableSortLabel,
+} from "@mui/material";
+import { ArrowDownward, ArrowUpward } from "@mui/icons-material";
 
 // Passwortvalidierung
 const passwordValidation = (password) => {
@@ -216,17 +226,24 @@ const AuthForm = ({ onLogin }) => {
 const App = () => {
   const [transaction, setTransaction] = useState({
     type: "",
+    date: new Date().toISOString().split("T")[0],
     amount: "",
     category: "",
-    date: "",
+    isRecurring: false,
+    recurrenceType: "",
+    nextDueDate: "", // Für die nächste Fälligkeit
   });
   const [transactions, setTransactions] = useState([]);
   const [filterCategory, setFilterCategory] = useState(""); // Filter für Kategorien
-  const [filterPeriod, setFilterPeriod] = useState(""); // Filter für Zeitraum (7 Tage, z.B.)
+  const [filterPeriod, setFilterPeriod] = useState("30"); // Filter für Zeitraum
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-
+  const [sortBy, setSortBy] = useState("date"); // Standardmäßig nach Datum sortieren
+  const [sortOrder, setSortOrder] = useState("asc"); // Standardmäßig aufsteigend sortieren
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [inactivityTimer, setInactivityTimer] = useState(null);
+  const [order, setOrder] = useState("asc");
+  const [orderBy, setOrderBy] = useState("date");
 
   const applyCustomFilter = () => {
     if (filterPeriod === "custom" && customStartDate && customEndDate) {
@@ -235,6 +252,38 @@ const App = () => {
     } else {
       // Standardzeitraum-Filter anwenden
       console.log("Standardzeitraum-Filter:", filterPeriod);
+    }
+  };
+
+  // Sortierfunktion
+  const handleRequestSort = (property) => {
+    const isAsc = orderBy === property && order === "asc";
+    setOrder(isAsc ? "desc" : "asc");
+    setOrderBy(property);
+  };
+
+  const sortData = (array, comparator) => {
+    const stabilizedArray = array.map((el, index) => [el, index]);
+    stabilizedArray.sort((a, b) => {
+      const orderComp = comparator(a[0], b[0]);
+      if (orderComp !== 0) return orderComp;
+      return a[1] - b[1];
+    });
+    return stabilizedArray.map((el) => el[0]);
+  };
+
+  // Comparator-Funktion für die Sortierung
+  const comparator = (a, b) => {
+    if (orderBy === "date") {
+      return order === "asc"
+        ? new Date(a.date) - new Date(b.date)
+        : new Date(b.date) - new Date(a.date);
+    } else if (orderBy === "amount") {
+      return order === "asc" ? a.amount - b.amount : b.amount - a.amount;
+    } else if (orderBy === "type") {
+      return order === "asc"
+        ? a.type.localeCompare(b.type)
+        : b.type.localeCompare(a.type);
     }
   };
 
@@ -257,9 +306,11 @@ const App = () => {
     return withinPeriod && byCategory;
   });
 
-  console.log("Gefilterte Transaktionen:", filteredTransactions);
-
-  const [inactivityTimer, setInactivityTimer] = useState(null);
+  // Daten nach Sortierung und Filter anwenden
+  const sortedAndFilteredTransactions = sortData(
+    filteredTransactions,
+    comparator
+  );
 
   useEffect(() => {
     // Function to logout the user
@@ -316,6 +367,29 @@ const App = () => {
     .reduce((sum, trans) => sum + parseFloat(trans.amount), 0);
 
   const totalBalance = totalIncome - totalExpenses;
+
+  const calculateNextDueDate = (startDate, recurrenceType) => {
+    let nextDate = new Date(startDate);
+
+    switch (recurrenceType) {
+      case "wöchentlich":
+        nextDate.setDate(nextDate.getDate() + 7);
+        break;
+      case "monatlich":
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        break;
+      case "quartal":
+        nextDate.setMonth(nextDate.getMonth() + 3);
+        break;
+      case "jahr":
+        nextDate.setFullYear(nextDate.getFullYear() + 1);
+        break;
+      default:
+        return null;
+    }
+
+    return nextDate.toISOString().split("T")[0]; // Format: YYYY-MM-DD
+  };
 
   // Kategorien für Einnahmen und Ausgaben
   const incomeCategories = [
@@ -376,75 +450,129 @@ const App = () => {
   const handleTransactionSubmit = async (e) => {
     e.preventDefault();
 
-    // Prüfen, ob alle Felder ausgefüllt sind
     if (!transaction.type || !transaction.amount || !transaction.category) {
       alert("Bitte alle Felder ausfüllen!");
       return;
     }
 
-    // Zugriffstoken aus dem lokalen Speicher abrufen
     const accessToken = localStorage.getItem("accessToken");
     if (!accessToken) {
       alert("Sie müssen angemeldet sein, um eine Transaktion hinzuzufügen.");
       return;
     }
 
-    console.log("Gespeicherter Token:", accessToken);
-    console.log("Gesendete Transaktionsdaten:", {
+    const transactionData = {
       type: transaction.type,
       amount: transaction.amount,
       category: transaction.category,
       date: transaction.date,
       description: transaction.description || "",
-    });
+      isRecurring: transaction.isRecurring || false, // Sicherstellen, dass das Feld gesetzt ist
+      recurrenceType: transaction.recurrenceType || null, // Falls vorhanden
+      nextDueDate: transaction.isRecurring
+        ? calculateNextDueDate(transaction.date, transaction.recurrenceType)
+        : null, // Berechnen oder null setzen
+    };
 
     try {
-      // API-Aufruf zum Speichern der Transaktion in der Datenbank
       const response = await fetch("http://127.0.0.1:5000/api/transactions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`, // Token für Authentifizierung
+          Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({
-          type: transaction.type,
-          amount: transaction.amount,
-          category: transaction.category,
-          date: transaction.date,
-          description: transaction.description || "", // Beschreibung optional
-        }),
+        body: JSON.stringify(transactionData),
       });
-
-      console.log("Antwortstatus:", response.status);
 
       if (!response.ok) {
         const responseData = await response.json();
-        console.log("Fehler bei der Antwort:", responseData); // Detaillierte Fehlerausgabe
-        throw new Error(
-          responseData.error || "Fehler beim Speichern der Transaktion."
-        );
+        console.error("Fehler bei der Antwort:", responseData);
+        throw new Error(responseData.error || "Fehler beim Speichern.");
       }
 
       const responseData = await response.json();
-      console.log("Serverantwort:", responseData);
+      setTransactions([...transactions, responseData]);
 
-      // Erfolgreiches Hinzufügen
-      setTransactions([...transactions, responseData]); // Hinzufügen zur Liste
+      // Formular zurücksetzen
       setTransaction({
         type: "",
         amount: "",
         category: "",
         date: "",
         description: "",
+        isRecurring: false,
+        recurrenceType: "",
       });
     } catch (error) {
       console.error("Fehler beim API-Aufruf:", error);
-      alert(
-        "Beim Speichern der Transaktion ist ein Fehler aufgetreten: " +
-          error.message
-      );
+      alert("Fehler: " + error.message);
     }
   };
+
+  const checkRecurringTransactions = async () => {
+    const today = new Date().toISOString().split("T")[0];
+
+    // Zugriffstoken abrufen
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
+      console.warn("Kein Zugriffstoken gefunden. Anmeldung erforderlich.");
+      return;
+    }
+
+    let updatedTransactions = [...transactions];
+
+    for (let txn of transactions) {
+      // Prüfen, ob die Transaktion wiederkehrend ist (egal ob Einnahme oder Ausgabe)
+      if (txn.isRecurring && txn.nextDueDate && txn.nextDueDate <= today) {
+        let newTransaction = {
+          ...txn,
+          date: txn.nextDueDate,
+          nextDueDate: calculateNextDueDate(
+            txn.nextDueDate,
+            txn.recurrenceType
+          ),
+        };
+
+        try {
+          const response = await fetch(
+            "http://127.0.0.1:5000/api/transactions",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify(newTransaction),
+            }
+          );
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Fehler beim Speichern:", errorData);
+            continue; // Falls ein Fehler auftritt, zur nächsten Transaktion springen
+          }
+
+          const savedTransaction = await response.json();
+          updatedTransactions.push(savedTransaction); // Neue Transaktion hinzufügen
+        } catch (error) {
+          console.error("API-Fehler:", error);
+        }
+      }
+    }
+
+    setTransactions(updatedTransactions); // Aktualisierte Transaktionsliste setzen
+  };
+
+  // Wiederkehrende Transaktionen regelmäßig prüfen (z.B. alle 24 Stunden)
+  useEffect(() => {
+    checkRecurringTransactions(); // Direkt beim Laden prüfen
+
+    const interval = setInterval(() => {
+      checkRecurringTransactions();
+    }, 24 * 60 * 60 * 1000); // Alle 24 Stunden
+
+    return () => clearInterval(interval); // Aufräumen bei Unmount
+  }, []);
 
   const fetchTransactions = async () => {
     const accessToken = localStorage.getItem("accessToken");
@@ -510,10 +638,10 @@ const App = () => {
         borderWidth: 1,
       },
       {
-        label: "Differenz", // Label für den Ausgaben-Balken
-        data: [0, 0, totalBalance], // Nur Ausgaben anzeigen
-        backgroundColor: "#87CEFA", // Roter Balken für Ausgaben
-        borderColor: "#87CEFA", // Roter Rand für Ausgaben
+        label: "Differenz", // Label für den Differenz-Balken
+        data: [0, 0, totalBalance], // Nur Differenz anzeigen
+        backgroundColor: "#87CEFA", // Blauer Balken für Differenz
+        borderColor: "#87CEFA", // Blauer Rand für Differenz
         borderWidth: 1,
       },
     ],
@@ -665,7 +793,7 @@ const App = () => {
   }
 
   return (
-    <Container maxWidth="sm" style={{ marginTop: "50px" }}>
+    <Container maxWidth="md" style={{ marginTop: "50px" }}>
       <Paper style={{ padding: "20px" }}>
         <Typography variant="h4" align="center" gutterBottom>
           Finanzübersicht
@@ -674,6 +802,7 @@ const App = () => {
         {/* Transaktionseingabe */}
         <form onSubmit={handleTransactionSubmit}>
           <Grid container spacing={2}>
+            {/* Transaktionstyp Auswahl */}
             <Grid item xs={12}>
               <Typography variant="h6" align="center" gutterBottom>
                 Wählen Sie den Transaktionstyp:
@@ -708,6 +837,7 @@ const App = () => {
               </Grid>
             </Grid>
 
+            {/* Datum Eingabe */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -717,7 +847,7 @@ const App = () => {
                 type="date"
                 value={
                   transaction.date || new Date().toISOString().split("T")[0]
-                } // Setzt das heutige Datum als Standardwert
+                }
                 onChange={handleChange}
                 InputLabelProps={{
                   shrink: true,
@@ -743,7 +873,7 @@ const App = () => {
               />
             </Grid>
 
-            {/* Dropdown für die Kategorien, abhängig vom Transaktionstyp */}
+            {/* Kategorie Auswahl */}
             <Grid item xs={12}>
               <Autocomplete
                 fullWidth
@@ -766,6 +896,74 @@ const App = () => {
               />
             </Grid>
 
+            {/* Wiederkehrend Ja/Nein Auswahl */}
+            <Grid item xs={12}>
+              <Typography variant="h6" align="center" gutterBottom>
+                Wiederkehrend?
+              </Typography>
+              <Grid container justifyContent="center" spacing={2}>
+                <Grid item>
+                  <Button
+                    variant={transaction.isRecurring ? "contained" : "outlined"}
+                    color="primary"
+                    onClick={() =>
+                      setTransaction({ ...transaction, isRecurring: true })
+                    }
+                  >
+                    Ja
+                  </Button>
+                </Grid>
+                <Grid item>
+                  <Button
+                    variant={
+                      !transaction.isRecurring ? "contained" : "outlined"
+                    }
+                    color="secondary"
+                    onClick={() =>
+                      setTransaction({
+                        ...transaction,
+                        isRecurring: false,
+                        recurrenceType: "",
+                      })
+                    }
+                  >
+                    Nein
+                  </Button>
+                </Grid>
+              </Grid>
+            </Grid>
+
+            {/* Wiederholungsfrequenz (wenn wiederkehrend "Ja") */}
+            {transaction.isRecurring &&
+              (transaction.type === "Einnahme" ||
+                transaction.type === "Ausgabe") && (
+                <Grid item xs={12}>
+                  <Autocomplete
+                    fullWidth
+                    value={transaction.recurrenceType}
+                    onChange={(event, newValue) =>
+                      setTransaction({
+                        ...transaction,
+                        recurrenceType: newValue,
+                      })
+                    }
+                    options={[
+                      "Wöchentlich",
+                      "Monatlich",
+                      "Quartal",
+                      "Jährlich",
+                    ]}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Wiederholungsintervall"
+                        required
+                      />
+                    )}
+                  />
+                </Grid>
+              )}
+
             {/* Hinzufügen Button */}
             <Grid item xs={12}>
               <Button
@@ -787,6 +985,9 @@ const App = () => {
             color="primary"
           >
             <FilterListIcon />
+            <Typography variant="h6" ml={1}>
+              Filter
+            </Typography>
           </IconButton>
         </Box>
 
@@ -881,65 +1082,101 @@ const App = () => {
 
       <Box marginTop={4}>
         <Typography variant="h6" align="center" margin={4} gutterBottom>
-          Transaktionen{" "}
+          Transaktionen
         </Typography>
-        <Paper style={{ padding: "10px" }}>
-          {filteredTransactions.length > 0 ? (
-            filteredTransactions.map((trans) => {
-              console.log("Transaktion:", trans);
-              console.log("Gefilterte Transaktionen:", filteredTransactions);
-              const isIncome = trans.type === "Einnahme";
-              // Bestimme die Farbe basierend auf der Kategorie
-              const categoryColor = categoryColors[trans.category] || "#BDBDBD"; // Grau, falls keine Farbe definiert
-              return (
-                <Box
-                  key={trans.id}
-                  marginBottom={2}
-                  display="flex"
-                  justifyContent="space-between"
-                  alignItems="center"
-                >
-                  <Typography
-                    variant="body1"
-                    style={{
-                      color: isIncome ? "#90EE90" : "#FF5733",
-                      padding: "5px",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    {trans.type} - {trans.amount} EUR - {trans.category}
-                  </Typography>
 
-                  {/* Hier wird das bunte Kategorielabel hinzugefügt */}
-                  <Box
-                    style={{
-                      backgroundColor: categoryColor,
-                      color: "#fff",
-                      borderRadius: "12px",
-                      padding: "2px 8px",
-                      marginLeft: "auto", // Damit es rechts ausgerichtet wird
-                      fontSize: "12px",
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {trans.category}
-                  </Box>
-
-                  <IconButton
-                    color="secondary"
-                    onClick={() => handleDeleteTransaction(trans.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
-              );
-            })
-          ) : (
-            <Typography variant="body2" color="textSecondary">
-              Keine Transaktionen vorhanden.
+        <Container maxWidth="md" style={{ marginTop: "50px" }}>
+          <Paper style={{ padding: "20px" }}>
+            <Typography variant="h4" align="center" gutterBottom>
+              Finanzübersicht
             </Typography>
-          )}
-        </Paper>
+
+            {/* Tabelle mit Transaktionen */}
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === "date"}
+                        direction={orderBy === "date" ? order : "asc"}
+                        onClick={() => handleRequestSort("date")}
+                      >
+                        Datum
+                        {orderBy === "date" &&
+                          (order === "desc" ? (
+                            <ArrowDownward />
+                          ) : (
+                            <ArrowUpward />
+                          ))}
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === "amount"}
+                        direction={orderBy === "amount" ? order : "asc"}
+                        onClick={() => handleRequestSort("amount")}
+                      >
+                        Betrag
+                        {orderBy === "amount" &&
+                          (order === "desc" ? (
+                            <ArrowDownward />
+                          ) : (
+                            <ArrowUpward />
+                          ))}
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>Kategorie</TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === "type"}
+                        direction={orderBy === "type" ? order : "asc"}
+                        onClick={() => handleRequestSort("type")}
+                      >
+                        Typ
+                        {orderBy === "type" &&
+                          (order === "desc" ? (
+                            <ArrowDownward />
+                          ) : (
+                            <ArrowUpward />
+                          ))}
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>Aktionen</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedAndFilteredTransactions.length > 0 ? (
+                    sortedAndFilteredTransactions.map((trans) => (
+                      <TableRow key={trans.id}>
+                        <TableCell>
+                          {new Date(trans.date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{trans.amount} EUR</TableCell>
+                        <TableCell>{trans.category}</TableCell>
+                        <TableCell>{trans.type}</TableCell>
+                        <TableCell>
+                          <IconButton
+                            color="secondary"
+                            onClick={() => handleDeleteTransaction(trans.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        Keine Transaktionen gefunden.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Container>
       </Box>
 
       {/* Diagramm */}
