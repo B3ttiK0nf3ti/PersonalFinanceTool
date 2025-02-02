@@ -232,7 +232,7 @@ def add_transaction():
 
         # Überprüfen, ob das Datum im richtigen Format ist
         try:
-            transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d')
+            datetime.strptime(data['date'].strip(), '%Y-%m-%d')
         except ValueError:
             return jsonify({"error": "Das angegebene Datum ist ungültig. Bitte das Datum im Format 'YYYY-MM-DD' eingeben."}), 400
 

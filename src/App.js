@@ -14,7 +14,6 @@ import {
   InputLabel,
   FormControl,
   IconButton,
-  InputAdornment,
 } from "@mui/material";
 import {
   LineChart,
@@ -23,10 +22,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
-import Chart from "chart.js/auto";
 import axios from "axios";
 import QRCode from "react-qr-code";
 import Autocomplete from "@mui/lab/Autocomplete";
@@ -246,8 +243,6 @@ const App = () => {
   const [filterCategory, setFilterCategory] = useState(""); // Filter für Kategorien
   const [filterPeriod, setFilterPeriod] = useState("30"); // Filter für Zeitraum
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-  const [sortBy, setSortBy] = useState("date"); // Standardmäßig nach Datum sortieren
-  const [sortOrder, setSortOrder] = useState("asc"); // Standardmäßig aufsteigend sortieren
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [inactivityTimer, setInactivityTimer] = useState(null);
@@ -426,31 +421,6 @@ const App = () => {
     "Kredite und Finanzierung",
     "Sonstiges",
   ];
-
-  const categoryColors = {
-    // Einnahmen-Kategorien
-    "Lohn/ Gehalt": "#673AB7", // Lila - kräftig und markant
-    "Einkünfte aus selbstständiger Tätigkeit – Unternehmerlohn": "#3F51B5", // Blau - vertrauensvoll und professionell
-    Förderungen: "#9C27B0", // Violett - kreativ und inspirierend
-    "Rente/ Pension": "#009688", // Teal - beruhigend und modern
-    "Staatliche Förderungen": "#2196F3", // Blau - kühl und professionell
-    Geldgeschenke: "#FF5722", // Korallenorange - lebendig und auffällig
-    "Dividenden/ Zinsen": "#607D8B", // Grau-Blau - dezent und ausbalanciert
-    "Sonstige Einnahmen": "#8D6E63", // Braun - warm und natürlich
-
-    // Ausgaben-Kategorien
-    Wohnen: "#00BCD4", // Cyan - frisch und kühl
-    Leben: "#FF4081", // Pink - lebendig und auffällig
-    "Gesundheit und Fürsorge": "#9E9D24", // Olive - zurückhaltend und erdig
-    "Hobbys, Freizeit und Sport": "#9E4D4D", // Ziegelrot - energisch und einladend
-    Mobilität: "#90EE90", // Grün - beruhigend und ausgleichend
-    "Beruf/ Bildung": "#FF9800", // Orange - dynamisch und energisch
-    Tierhaltung: "#9C27B0", // Lila - sanft und kreativ
-    "Weitere Ausgabenarten": "#03A9F4", // Himmelblau - cool und einladend
-    "Versicherungen und Steuern": "#E91E63", // Magenta - kräftig und prägnant
-    "Kredite und Finanzierung": "#3F51B5", // Blau - seriös und ruhig
-    Sonstiges: "#8BC34A", // Pastellgrün - beruhigend und frisch
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -693,31 +663,9 @@ const App = () => {
     },
   };
 
-  const chartData2 = filteredTransactions.reduce(
-    (acc, trans) => {
-      const lastIncome =
-        acc.income.length > 0 ? acc.income[acc.income.length - 1] : 0;
-      const lastExpense =
-        acc.expense.length > 0 ? acc.expense[acc.expense.length - 1] : 0;
-
-      // Kumulierte Einnahmen und Ausgaben berechnen
-      acc.income.push(
-        lastIncome + (trans.type === "Einnahme" ? trans.amount : 0)
-      );
-      acc.expense.push(
-        lastExpense + (trans.type === "Ausgabe" ? trans.amount : 0)
-      );
-
-      return acc;
-    },
-    { income: [], expense: [] }
-  );
-
   // Transaktionen nach Datum gruppieren und kumulieren
   const groupedTransactions = filteredTransactions.reduce((acc, trans) => {
     const date = trans.date; // Datum der Transaktion
-    const amount = trans.type === "Einnahme" ? trans.amount : -trans.amount; // Einnahme oder Ausgabe
-
     // Wenn das Datum bereits im Accumulator vorhanden ist, füge die Menge hinzu
     if (acc[date]) {
       acc[date].income += trans.type === "Einnahme" ? trans.amount : 0;
