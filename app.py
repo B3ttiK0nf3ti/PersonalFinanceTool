@@ -23,8 +23,6 @@ jwt = JWTManager(app)
 
 # Log-Level und Dateipfad für Fehlerlogs
 app.logger.setLevel(logging.DEBUG)
-file_handler = FileHandler('app_errors.log')
-app.logger.addHandler(file_handler)
 
 # Fehlerbehandlung
 @app.errorhandler(500)

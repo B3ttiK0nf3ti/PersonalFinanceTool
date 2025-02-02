@@ -44,6 +44,11 @@ import {
   TableSortLabel,
 } from "@mui/material";
 import { ArrowDownward, ArrowUpward } from "@mui/icons-material";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+import { saveAs } from "file-saver";
+import DownloadIcon from "@mui/icons-material/Download";
+import Menu from "@mui/material/Menu";
 
 // Passwortvalidierung
 const passwordValidation = (password) => {
@@ -248,6 +253,7 @@ const App = () => {
   const [inactivityTimer, setInactivityTimer] = useState(null);
   const [order, setOrder] = useState("asc");
   const [orderBy, setOrderBy] = useState("date");
+  const [anchorEl, setAnchorEl] = useState(null);
 
   const applyCustomFilter = () => {
     if (filterPeriod === "custom" && customStartDate && customEndDate) {
@@ -654,19 +660,33 @@ const App = () => {
     plugins: {
       legend: {
         position: "top",
+        labels: {
+          font: {
+            size: 14, // Einheitliche Schriftgröße für die Legende
+          },
+        },
       },
     },
     scales: {
+      x: {
+        ticks: {
+          font: {
+            size: 14, // Einheitliche Schriftgröße für die X-Achse
+          },
+        },
+      },
       y: {
         beginAtZero: true,
         ticks: {
-          // Hier wird die Formatierung für die Y-Achse festgelegt
+          font: {
+            size: 14, // Einheitliche Schriftgröße für die Y-Achse
+          },
           callback: function (value) {
             return new Intl.NumberFormat("de-DE", {
               style: "decimal",
               maximumFractionDigits: 2,
               minimumFractionDigits: 2,
-            }).format(value); // Formatierung der Zahl mit Tausendertrennzeichen und zwei Dezimalstellen
+            }).format(value);
           },
         },
       },
@@ -797,6 +817,71 @@ const App = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("userEmail");
     setUser(null); // Reset user state
+  };
+
+  const handleMenuClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const exportToCSV = () => {
+    const csvContent = [
+      ["Datum", "Betrag", "Kategorie", "Typ", "Wiederkehrend"], // Kopfzeile
+      ...sortedAndFilteredTransactions.map((trans) => {
+        const amount =
+          trans.type === "Einnahme"
+            ? trans.amount // Einnahme bleibt positiv
+            : -trans.amount; // Ausgabe wird negativ
+
+        return [
+          new Date(trans.date).toLocaleDateString(), // Datum
+          amount, // Betrag (nur Zahl, positiv oder negativ)
+          trans.category, // Kategorie
+          trans.type, // Typ (Einnahme oder Ausgabe)
+          trans.isRecurring === 1 ? "Ja" : "Nein", // Wiederkehrend
+        ];
+      }),
+    ]
+      .map((e) => e.join(";")) // Zeilen zusammenfügen mit Semikolon
+      .join("\n"); // Zeilen trennen
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    saveAs(blob, "transaktionen.csv");
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Transaktionen", 14, 10);
+
+    const tableData = sortedAndFilteredTransactions.map((trans) => {
+      const amount =
+        trans.type === "Einnahme"
+          ? trans.amount // Einnahme bleibt positiv
+          : -trans.amount; // Ausgabe wird negativ
+
+      return [
+        new Date(trans.date).toLocaleDateString(),
+        `${amount}`, // Betrag als Zahl (positiv oder negativ)
+        trans.category,
+        trans.type,
+        trans.isRecurring === 1 ? "Ja" : "Nein",
+      ];
+    });
+
+    // AutoTable für die Tabelle im PDF
+    doc.autoTable({
+      head: [["Datum", "Betrag", "Kategorie", "Typ", "Wiederkehrend"]],
+      body: tableData,
+      columnStyles: {
+        1: { halign: "right" }, // Betrag rechtsbündig ausrichten
+      },
+    });
+
+    doc.save("transaktionen.pdf");
+    handleMenuClose();
   };
 
   if (!user) {
@@ -1101,8 +1186,21 @@ const App = () => {
         <Typography variant="h6" align="center" margin={4} gutterBottom>
           Transaktionen
         </Typography>
+        <Box display="flex" justifyContent="flex-end" marginRight={2}>
+          <IconButton color="primary" onClick={handleMenuClick}>
+            <DownloadIcon />
+          </IconButton>
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+          >
+            <MenuItem onClick={exportToCSV}>Als CSV herunterladen</MenuItem>
+            <MenuItem onClick={exportToPDF}>Als PDF herunterladen</MenuItem>
+          </Menu>
+        </Box>
 
-        <Container maxWidth="md" style={{ marginTop: "50px" }}>
+        <Container maxWidth="md" style={{ marginTop: "10px" }}>
           <Paper style={{ padding: "20px" }}>
             {/* Tabelle mit Transaktionen */}
             <TableContainer component={Paper}>
@@ -1220,11 +1318,13 @@ const App = () => {
         <Typography variant="h6" align="center" margin={4} gutterBottom>
           Finanzübersicht Liniendiagramm
         </Typography>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={450}>
           <LineChart data={chartData2Formatted}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" tick={{ dy: 10 }} />
             <YAxis
+              width={80} // Erhöht den Platz für die Y-Achse
+              tickMargin={10} // Erhöht den Abstand der Zahlen
               tickFormatter={(value) =>
                 new Intl.NumberFormat("de-DE", {
                   style: "decimal",
@@ -1234,7 +1334,6 @@ const App = () => {
               }
             />
             <Tooltip />
-            <Legend />
             <Line type="monotone" dataKey="Einnahmen" stroke="#90EE90" />
             <Line type="monotone" dataKey="Ausgaben" stroke="#FF5733" />
           </LineChart>
