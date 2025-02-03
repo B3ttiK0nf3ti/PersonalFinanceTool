@@ -46,6 +46,9 @@ import "jspdf-autotable";
 import { saveAs } from "file-saver";
 import DownloadIcon from "@mui/icons-material/Download";
 import Menu from "@mui/material/Menu";
+import { Chart, registerables } from "chart.js";
+
+Chart.register(...registerables);
 
 // Passwortvalidierung
 const passwordValidation = (password) => {
@@ -69,6 +72,7 @@ const AuthForm = ({ onLogin }) => {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState(""); // QR-Code URL, die hier vorbereitet wird
+  const [secret, setSecret] = useState("");
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -107,8 +111,13 @@ const AuthForm = ({ onLogin }) => {
 
       // Serverantwort analysieren
       if (response.data.success) {
-        if (isRegistering && response.data.qrCodeUrl) {
-          setQrCodeUrl(response.data.qrCodeUrl); // QR-Code wird nur bei Registrierung gespeichert
+        if (isRegistering) {
+          if (response.data.qrCodeUrl) {
+            setQrCodeUrl(response.data.qrCodeUrl); // Setze den QR-Code
+          }
+          if (response.data.secret) {
+            setSecret(response.data.secret); // Setze das Secret
+          }
         } else if (response.data.mfaRequired) {
           setSnackbarMessage(
             "MFA erforderlich. Bitte geben Sie Ihren MFA-Code ein."
@@ -116,13 +125,8 @@ const AuthForm = ({ onLogin }) => {
           setOpenSnackbar(true);
         } else {
           localStorage.setItem("accessToken", response.data.token);
-          localStorage.setItem("userEmail", formData.email); // E-Mail korrekt speichern
-          onLogin(formData.email); // E-Mail als Argument übergeben
-          console.log("E-Mail beim Absenden:", formData.email); // Debugging-Ausgabe
-          console.log(
-            "Gespeichertes Token:",
-            localStorage.getItem("accessToken")
-          );
+          localStorage.setItem("userEmail", formData.email);
+          onLogin(formData.email);
         }
       } else {
         setSnackbarMessage(response.data.message || "Unbekannter Fehler");
@@ -194,7 +198,20 @@ const AuthForm = ({ onLogin }) => {
             <Typography variant="h6">
               Scanne den QR-Code mit deiner Authenticator-App
             </Typography>
-            <QRCode value={qrCodeUrl} />
+            <img
+              src={qrCodeUrl}
+              alt="QR Code für MFA"
+              style={{ maxWidth: "100%", width: "200px", height: "auto" }}
+            />
+          </Box>
+        )}
+
+        {isRegistering && secret && (
+          <Box mt={2} align="center">
+            <Typography variant="h6">Alternativ: Manuelles Secret</Typography>
+            <Typography variant="body1" style={{ wordBreak: "break-word" }}>
+              {secret}
+            </Typography>
           </Box>
         )}
 

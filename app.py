@@ -123,7 +123,7 @@ def register():
 
     # Generiere einen geheimen Schlüssel für den Benutzer (für MFA)
     totp = pyotp.TOTP(pyotp.random_base32())
-    secret = totp.secret  # Dies ist der geheime Schlüssel, den der Benutzer mit einer Authenticator-App scannt
+    secret = totp.secret
 
     # Speichern in der Datenbank
     new_user = User(email=email, password=hashed_password, secret=secret)
@@ -131,7 +131,8 @@ def register():
     db.session.commit()
 
     # Generiere den QR-Code URI
-    uri = totp.provisioning_uri(name=email, issuer_name="MyApp")
+    uri = totp.provisioning_uri(name=email, issuer_name="PersonalFinanceTool")
+    print("Generierte MFA-URI:", uri)  # Debugging-Ausgabe in der Konsole
 
     # Erzeuge den QR-Code
     img = qrcode.make(uri)
@@ -146,7 +147,8 @@ def register():
     return jsonify({
         "success": True,
         "message": "Registrierung erfolgreich!",
-        "qrCodeUrl": f"data:image/png;base64,{img_base64}"  # Geben wir das Base64-Bild zurück
+        "qrCodeUrl": f"data:image/png;base64,{img_base64}",  # Geben wir das Base64-Bild zurück
+        "secret": secret
     })
 
 # Endpunkt: Benutzeranmeldung (QR-Code entfernen)
