@@ -12,11 +12,25 @@ from flask_jwt_extended import JWTManager, create_access_token
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
 import calendar
-
-
+import secrets
+import smtplib
+from flask_mail import Mail, Message
 
 # Flask-App initialisieren
 app = Flask(__name__)
+
+# App Konfigurationen
+app.config["MAIL_SERVER"] = "smtp.mailtrap.io"  # Mailtrap SMTP-Server
+app.config["MAIL_PORT"] = 587  # Port 587 für TLS
+app.config["MAIL_USERNAME"] = "3b0d4febcdb859"  # Dein Mailtrap Benutzername
+app.config["MAIL_PASSWORD"] = "a79ee474e7d0b2"  # Dein Mailtrap Passwort
+app.config["MAIL_USE_TLS"] = True  # TLS aktivieren
+app.config["MAIL_USE_SSL"] = False  # SSL deaktivieren
+
+mail = Mail(app)
+
+# Dictionary zum Speichern der Reset-Tokens temporär
+reset_tokens = {}
 
 app.config["JWT_SECRET_KEY"] = "dein_geheimes_schluessel"
 jwt = JWTManager(app)
@@ -340,7 +354,62 @@ def delete_transaction(transaction_id):
     except Exception as e:
         return jsonify({"error": f"Fehler beim Löschen der Transaktion: {str(e)}"}), 500
 
-    
+# Passwort-Reset anfordern
+@app.route('/request-password-reset', methods=['POST'])
+def request_password_reset():
+    data = request.json
+    email = data.get("email")
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"success": False, "message": "E-Mail nicht gefunden!"}), 404
+
+    # Erzeuge einen zufälligen Token
+    token = secrets.token_hex(16)
+    reset_tokens[email] = token  # Temporär speichern
+
+    # E-Mail mit dem Token senden
+    sender_email = "deineemail@example.com"  # Ersetze mit deiner E-Mail
+    recipient_email = email
+    subject = "Passwort zurücksetzen"
+    body = f"Hier ist dein Reset-Token: {token}"
+
+    try:
+        msg = Message(subject, sender=sender_email, recipients=[recipient_email])
+        msg.body = body
+        mail.send(msg)
+        
+        return jsonify({"success": True, "message": "Reset-Token gesendet!"})
+    except Exception as e:
+        return jsonify({"success": False, "message": f"E-Mail konnte nicht gesendet werden: {str(e)}"}), 500
+
+# Passwort mit Token zurücksetzen
+@app.route('/reset-password', methods=['POST'])
+def reset_password():
+    data = request.json
+    email = data.get("email")
+    token = data.get("token")
+    new_password = data.get("newPassword")
+
+    if email not in reset_tokens or reset_tokens[email] != token:
+        return jsonify({"success": False, "message": "Ungültiger oder abgelaufener Token!"}), 400
+
+    if not is_strong_password(new_password):
+        return jsonify({"success": False, "message": "Schwaches Passwort!"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"success": False, "message": "Benutzer nicht gefunden!"}), 404
+
+    # Neues Passwort hashen und speichern
+    hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+    user.password = hashed_password
+    db.session.commit()
+
+    # Token entfernen, damit es nicht erneut verwendet werden kann
+    del reset_tokens[email]
+
+    return jsonify({"success": True, "message": "Passwort erfolgreich zurückgesetzt!"})
 
 if __name__ == '__main__':
     # Flask-Server starten

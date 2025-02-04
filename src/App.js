@@ -25,7 +25,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import axios from "axios";
-import QRCode from "react-qr-code";
 import Autocomplete from "@mui/lab/Autocomplete";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FilterListIcon from "@mui/icons-material/FilterList";
@@ -63,10 +62,16 @@ const formatNumber = (number) => {
 
 const AuthForm = ({ onLogin }) => {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     mfaCode: "",
+  });
+  const [resetData, setResetData] = useState({
+    email: "",
+    token: "",
+    newPassword: "",
   });
   const [message, setMessage] = useState("");
   const [openSnackbar, setOpenSnackbar] = useState(false);
@@ -76,6 +81,10 @@ const AuthForm = ({ onLogin }) => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleResetChange = (e) => {
+    setResetData({ ...resetData, [e.target.name]: e.target.value });
   };
 
   const handleSnackbarClose = () => {
@@ -139,60 +148,158 @@ const AuthForm = ({ onLogin }) => {
     }
   };
 
+  const requestResetToken = async () => {
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:5000/request-password-reset",
+        { email: resetData.email }
+      );
+      setSnackbarMessage(response.data.message);
+      setOpenSnackbar(true);
+    } catch (error) {
+      setSnackbarMessage(
+        error.response?.data?.message || "Fehler beim Anfordern des Tokens!"
+      );
+      setOpenSnackbar(true);
+    }
+  };
+
+  const resetPassword = async () => {
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:5000/reset-password",
+        resetData
+      );
+      setSnackbarMessage(response.data.message);
+      setOpenSnackbar(true);
+      if (response.data.success) setIsResetting(false);
+    } catch (error) {
+      setSnackbarMessage(
+        error.response?.data?.message ||
+          "Fehler beim Zurücksetzen des Passworts!"
+      );
+      setOpenSnackbar(true);
+    }
+  };
+
   return (
-    <Container maxWidth="xs" style={{ marginTop: "100px" }}>
+    <Container maxWidth="xs" style={{ marginTop: "80px" }}>
       <Paper style={{ padding: "20px" }}>
         <Typography variant="h5" align="center" gutterBottom>
-          {isRegistering ? "Registrierung" : "Anmeldung"}
+          {isResetting
+            ? "Passwort zurücksetzen"
+            : isRegistering
+            ? "Registrierung"
+            : "Anmeldung"}
         </Typography>
-        <form onSubmit={handleSubmit}>
-          <Box mb={2}>
-            <TextField
-              fullWidth
-              label="E-Mail"
-              variant="outlined"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-          </Box>
-          <Box mb={2}>
-            <TextField
-              fullWidth
-              label="Passwort"
-              variant="outlined"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-            />
-            {message && <Typography color="error">{message}</Typography>}
-          </Box>
 
-          {(!isRegistering || qrCodeUrl) && (
+        {/* Login & Registrierung */}
+        {!isResetting ? (
+          <form onSubmit={handleSubmit}>
             <Box mb={2}>
               <TextField
                 fullWidth
-                label="MFA-Code"
+                label="E-Mail"
                 variant="outlined"
-                name="mfaCode"
-                type="text"
-                value={formData.mfaCode}
+                name="email"
+                type="email"
+                value={formData.email}
                 onChange={handleChange}
                 required
               />
             </Box>
-          )}
+            <Box mb={2}>
+              <TextField
+                fullWidth
+                label="Passwort"
+                variant="outlined"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+              />
+              {message && <Typography color="error">{message}</Typography>}
+            </Box>
 
-          <Button type="submit" variant="contained" color="primary" fullWidth>
-            {isRegistering ? "Registrieren" : "Anmelden"}
-          </Button>
-        </form>
+            {/* MFA-Feld nur anzeigen, wenn notwendig */}
+            {(!isRegistering || qrCodeUrl) && (
+              <Box mb={2}>
+                <TextField
+                  fullWidth
+                  label="MFA-Code"
+                  variant="outlined"
+                  name="mfaCode"
+                  type="text"
+                  value={formData.mfaCode}
+                  onChange={handleChange}
+                  required
+                />
+              </Box>
+            )}
 
-        {/* QR-Code anzeigen, falls erforderlich */}
+            <Button type="submit" variant="contained" color="primary" fullWidth>
+              {isRegistering ? "Registrieren" : "Anmelden"}
+            </Button>
+          </form>
+        ) : (
+          // Passwort-Reset Formular
+          <>
+            <TextField
+              fullWidth
+              label="E-Mail-Adresse"
+              variant="outlined"
+              name="email"
+              type="email"
+              value={resetData.email}
+              onChange={handleResetChange}
+              required
+            />
+            <Button
+              onClick={requestResetToken}
+              variant="contained"
+              color="primary"
+              fullWidth
+              style={{ marginTop: "10px" }}
+            >
+              Reset-Link anfordern
+            </Button>
+
+            <TextField
+              fullWidth
+              label="Reset-Token"
+              variant="outlined"
+              name="token"
+              type="text"
+              value={resetData.token}
+              onChange={handleResetChange}
+              required
+              style={{ marginTop: "10px" }}
+            />
+            <TextField
+              fullWidth
+              label="Neues Passwort"
+              variant="outlined"
+              name="newPassword"
+              type="password"
+              value={resetData.newPassword}
+              onChange={handleResetChange}
+              required
+              style={{ marginTop: "10px" }}
+            />
+            <Button
+              onClick={resetPassword}
+              variant="contained"
+              color="primary"
+              fullWidth
+              style={{ marginTop: "10px" }}
+            >
+              Passwort zurücksetzen
+            </Button>
+          </>
+        )}
+
+        {/* QR-Code für MFA nach der Registrierung anzeigen */}
         {isRegistering && qrCodeUrl && (
           <Box mt={2} align="center">
             <Typography variant="h6">
@@ -206,6 +313,7 @@ const AuthForm = ({ onLogin }) => {
           </Box>
         )}
 
+        {/* Secret für MFA anzeigen */}
         {isRegistering && secret && (
           <Box mt={2} align="center">
             <Typography variant="h6">Alternativ: Manuelles Secret</Typography>
@@ -215,19 +323,30 @@ const AuthForm = ({ onLogin }) => {
           </Box>
         )}
 
+        {/* Navigation zwischen Login, Registrierung & Passwort-Reset */}
         <Box mt={2}>
+          {!isResetting && (
+            <Button
+              fullWidth
+              color="secondary"
+              onClick={() => setIsRegistering(!isRegistering)}
+            >
+              {isRegistering
+                ? "Bereits ein Konto? Anmelden"
+                : "Kein Konto? Registrieren"}
+            </Button>
+          )}
           <Button
             fullWidth
             color="secondary"
-            onClick={() => setIsRegistering(!isRegistering)}
+            onClick={() => setIsResetting(!isResetting)}
           >
-            {isRegistering
-              ? "Bereits ein Konto? Anmelden"
-              : "Kein Konto? Registrieren"}
+            {isResetting ? "Zurück zur Anmeldung" : "Passwort vergessen?"}
           </Button>
         </Box>
       </Paper>
 
+      {/* Snackbar für Erfolgs-/Fehlermeldungen */}
       <Snackbar
         open={openSnackbar}
         autoHideDuration={6000}
