@@ -8,6 +8,7 @@
     "@mui/icons-material": "^6.4.2",
     "@mui/lab": "^6.0.0-beta.24",
     "@mui/material": "^6.4.2",
+    "@testing-library/react": "^16.2.0",
     "axios": "^1.7.9",
     "chart.js": "^4.4.7",
     "cra-template": "1.2.0",
@@ -25,8 +26,14 @@
     "web-vitals": "^4.2.4"
   },
   "devDependencies": {
-    "semver": "^7.3.5",  
-    "babel-preset-react-app": "^10.0.0"  
+    "@babel/plugin-proposal-private-methods": "^7.16.0",
+    "@babel/plugin-proposal-private-property-in-object": "^7.16.0",
+    "@babel/preset-env": "^7.16.0",
+    "@babel/preset-react": "^7.16.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "babel-jest": "^28.0.1",
+    "babel-preset-react-app": "^10.0.0",
+    "semver": "^7.3.5"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -50,6 +57,11 @@
       "last 1 chrome version",
       "last 1 firefox version",
       "last 1 safari version"
+    ]
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "/node_modules/(?!axios|some-other-module-to-transform)/"
     ]
   }
 }
