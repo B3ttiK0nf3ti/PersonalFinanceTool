@@ -29,7 +29,7 @@ import Autocomplete from "@mui/lab/Autocomplete";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { Bar } from "react-chartjs-2";
-import { parseISO, format, isValid } from "date-fns"; // Importiere isValid
+import { parseISO, format, isValid } from "date-fns";
 import {
   Table,
   TableBody,
@@ -57,7 +57,7 @@ const passwordValidation = (password) => {
 };
 
 const formatNumber = (number) => {
-  return new Intl.NumberFormat("de-DE").format(number); // 'de-DE' für deutsche Formatierung
+  return new Intl.NumberFormat("de-DE").format(number);
 };
 
 const AuthForm = ({ onLogin }) => {
@@ -76,7 +76,7 @@ const AuthForm = ({ onLogin }) => {
   const [message, setMessage] = useState("");
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [qrCodeUrl, setQrCodeUrl] = useState(""); // QR-Code URL, die hier vorbereitet wird
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [secret, setSecret] = useState("");
 
   const handleChange = (e) => {
@@ -112,7 +112,7 @@ const AuthForm = ({ onLogin }) => {
       const response = await axios.post(url, {
         email: formData.email,
         password: formData.password,
-        mfaCode: formData.mfaCode, // MFA-Code wird immer mitgesendet
+        mfaCode: formData.mfaCode,
       });
 
       // Debugging-Ausgabe der Serverantwort
@@ -122,10 +122,10 @@ const AuthForm = ({ onLogin }) => {
       if (response.data.success) {
         if (isRegistering) {
           if (response.data.qrCodeUrl) {
-            setQrCodeUrl(response.data.qrCodeUrl); // Setze den QR-Code
+            setQrCodeUrl(response.data.qrCodeUrl);
           }
           if (response.data.secret) {
-            setSecret(response.data.secret); // Setze das Secret
+            setSecret(response.data.secret);
           }
         } else if (response.data.mfaRequired) {
           setSnackbarMessage(
@@ -373,11 +373,11 @@ const App = () => {
     category: "",
     isRecurring: false,
     recurrenceType: "",
-    nextDueDate: "", // Für die nächste Fälligkeit
+    nextDueDate: "",
   });
   const [transactions, setTransactions] = useState([]);
-  const [filterCategory, setFilterCategory] = useState(""); // Filter für Kategorien
-  const [filterPeriod, setFilterPeriod] = useState("30"); // Filter für Zeitraum
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterPeriod, setFilterPeriod] = useState("30");
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
@@ -454,7 +454,7 @@ const App = () => {
   );
 
   useEffect(() => {
-    // Function to logout the user
+    // logout the user
     const logout = () => {
       localStorage.removeItem("authToken");
       localStorage.removeItem("userEmail");
@@ -462,9 +462,9 @@ const App = () => {
       alert("You have been logged out due to inactivity.");
     };
 
-    // Reset inactivity timer on user activity
+    // Reset inactivity timer
     const resetTimer = () => {
-      if (inactivityTimer) clearTimeout(inactivityTimer); // Clear the previous timer
+      if (inactivityTimer) clearTimeout(inactivityTimer);
       const timer = setTimeout(logout, 15 * 60 * 1000); // 15 minutes in milliseconds
       setInactivityTimer(timer);
     };
@@ -529,7 +529,7 @@ const App = () => {
         return null;
     }
 
-    return nextDate.toISOString().split("T")[0]; // Format: YYYY-MM-DD
+    return nextDate.toISOString().split("T")[0];
   };
 
   // Kategorien für Einnahmen und Ausgaben
@@ -583,7 +583,7 @@ const App = () => {
       category: transaction.category,
       date: transaction.date,
       description: transaction.description || "",
-      isRecurring: JSON.parse(transaction.isRecurring || "false"), // Hier sicherstellen, dass es ein Boolean ist
+      isRecurring: JSON.parse(transaction.isRecurring || "false"),
       recurrenceType: transaction.recurrenceType || null,
       nextDueDate: transaction.isRecurring
         ? calculateNextDueDate(transaction.date, transaction.recurrenceType)
@@ -669,29 +669,29 @@ const App = () => {
           if (!response.ok) {
             const errorData = await response.json();
             console.error("Fehler beim Speichern:", errorData);
-            continue; // Falls ein Fehler auftritt, zur nächsten Transaktion springen
+            continue;
           }
 
           const savedTransaction = await response.json();
-          updatedTransactions.push(savedTransaction); // Neue Transaktion hinzufügen
+          updatedTransactions.push(savedTransaction);
         } catch (error) {
           console.error("API-Fehler:", error);
         }
       }
     }
 
-    setTransactions(updatedTransactions); // Aktualisierte Transaktionsliste setzen
+    setTransactions(updatedTransactions);
   };
 
   // Wiederkehrende Transaktionen regelmäßig prüfen (z.B. alle 24 Stunden)
   useEffect(() => {
-    checkRecurringTransactions(); // Direkt beim Laden prüfen
+    checkRecurringTransactions();
 
     const interval = setInterval(() => {
       checkRecurringTransactions();
     }, 24 * 60 * 60 * 1000); // Alle 24 Stunden
 
-    return () => clearInterval(interval); // Aufräumen bei Unmount
+    return () => clearInterval(interval);
   }, []);
 
   const fetchTransactions = async () => {
@@ -710,11 +710,11 @@ const App = () => {
 
       // Überprüfe, ob die Antwort JSON ist, bevor du versuchst, sie zu parsen
       if (response.ok) {
-        const data = await response.json(); // Direkt als JSON parsen
+        const data = await response.json();
         console.log("Antwort vom Server als JSON:", data);
-        setTransactions(data); // Setze die Transaktionen im State
+        setTransactions(data);
       } else {
-        const errorText = await response.text(); // Fehler als Text lesen
+        const errorText = await response.text();
         console.error("Fehler beim Abrufen der Transaktionen:", errorText);
       }
     } catch (error) {
@@ -728,33 +728,33 @@ const App = () => {
   }, []);
 
   const resetFilters = () => {
-    setFilterCategory(""); // Zurücksetzen der Kategorie
-    setFilterPeriod(""); // Zurücksetzen des Zeitraums
+    setFilterCategory("");
+    setFilterPeriod("");
   };
 
   // Chart-Daten vorbereiten
   const chartData = {
-    labels: ["Einnahmen", "Ausgaben", "Differenz"], // Beschriftungen der Balken
+    labels: ["Einnahmen", "Ausgaben", "Differenz"],
     datasets: [
       {
-        label: "Einnahmen", // Label für den Einnahmen-Balken
-        data: [totalIncome, 0, 0], // Nur Einnahmen anzeigen
-        backgroundColor: "#90EE90", // Grüner Balken für Einnahmen
-        borderColor: "#90EE90", // Grüner Rand für Einnahmen
+        label: "Einnahmen",
+        data: [totalIncome, 0, 0],
+        backgroundColor: "#90EE90",
+        borderColor: "#90EE90",
         borderWidth: 1,
       },
       {
-        label: "Ausgaben", // Label für den Ausgaben-Balken
-        data: [0, totalExpenses, 0], // Nur Ausgaben anzeigen
-        backgroundColor: "#FF5733", // Roter Balken für Ausgaben
-        borderColor: "#FF5733", // Roter Rand für Ausgaben
+        label: "Ausgaben",
+        data: [0, totalExpenses, 0],
+        backgroundColor: "#FF5733",
+        borderColor: "#FF5733",
         borderWidth: 1,
       },
       {
-        label: "Differenz", // Label für den Differenz-Balken
-        data: [0, 0, totalBalance], // Nur Differenz anzeigen
-        backgroundColor: "#87CEFA", // Blauer Balken für Differenz
-        borderColor: "#87CEFA", // Blauer Rand für Differenz
+        label: "Differenz",
+        data: [0, 0, totalBalance],
+        backgroundColor: "#87CEFA",
+        borderColor: "#87CEFA",
         borderWidth: 1,
       },
     ],
@@ -768,7 +768,7 @@ const App = () => {
         position: "top",
         labels: {
           font: {
-            size: 14, // Einheitliche Schriftgröße für die Legende
+            size: 14,
           },
         },
       },
@@ -777,7 +777,7 @@ const App = () => {
       x: {
         ticks: {
           font: {
-            size: 14, // Einheitliche Schriftgröße für die X-Achse
+            size: 14,
           },
         },
       },
@@ -785,7 +785,7 @@ const App = () => {
         beginAtZero: true,
         ticks: {
           font: {
-            size: 14, // Einheitliche Schriftgröße für die Y-Achse
+            size: 14,
           },
           callback: function (value) {
             return new Intl.NumberFormat("de-DE", {
@@ -801,13 +801,13 @@ const App = () => {
 
   // Transaktionen nach Datum gruppieren und kumulieren
   const groupedTransactions = filteredTransactions.reduce((acc, trans) => {
-    const date = trans.date; // Datum der Transaktion
+    const date = trans.date;
     // Wenn das Datum bereits im Accumulator vorhanden ist, füge die Menge hinzu
     if (acc[date]) {
       acc[date].income += trans.type === "Einnahme" ? trans.amount : 0;
       acc[date].expense += trans.type === "Ausgabe" ? trans.amount : 0;
     } else {
-      // Andernfalls erstelle einen neuen Eintrag für das Datum
+      // Andernfalls neuen Eintrag für das Datum
       acc[date] = {
         income: trans.type === "Einnahme" ? trans.amount : 0,
         expense: trans.type === "Ausgabe" ? trans.amount : 0,
@@ -819,7 +819,7 @@ const App = () => {
 
   // Sortiere die gruppierten Transaktionen nach Datum
   const sortedGroupedTransactions = Object.keys(groupedTransactions)
-    .sort((a, b) => new Date(a) - new Date(b)) // Sortiere nach Datum
+    .sort((a, b) => new Date(a) - new Date(b))
     .map((date) => ({
       date,
       Einnahmen: groupedTransactions[date].income,
@@ -843,18 +843,18 @@ const App = () => {
 
     // Prüfen, ob das Datum gültig ist
     if (!isValid(parsedDate)) {
-      console.error(`Ungültiges Datum: ${entry.date}`); // Detaillierte Fehlermeldung
+      console.error(`Ungültiges Datum: ${entry.date}`);
       return {
-        date: "Invalid Date", // Fallback bei ungültigem Datum
+        date: "Invalid Date",
         Einnahmen: cumulativeIncome,
         Ausgaben: cumulativeExpense,
       };
     }
 
     return {
-      date: format(parsedDate, "dd.MM.yyyy"), // Datum im richtigen Format
-      Einnahmen: cumulativeIncome, // Kumulierte Einnahmen
-      Ausgaben: cumulativeExpense, // Kumulierte Ausgaben
+      date: format(parsedDate, "dd.MM.yyyy"),
+      Einnahmen: cumulativeIncome,
+      Ausgaben: cumulativeExpense,
     };
   });
 
@@ -889,12 +889,11 @@ const App = () => {
   const [user, setUser] = useState(localStorage.getItem("userEmail")); // E-Mail-Adresse aus localStorage holen
 
   const handleLogin = (email) => {
-    console.log("E-Mail in handleLogin:", email); // Debugging-Ausgabe
+    console.log("E-Mail in handleLogin:", email);
     setUser(email);
-    localStorage.setItem("userEmail", email); // E-Mail im localStorage speichern
+    localStorage.setItem("userEmail", email);
 
-    // Rufe fetchTransactions direkt nach dem Login auf
-    fetchTransactions(); // Transaktionen nach dem Login abrufen
+    fetchTransactions();
   };
 
   const handleLogout = () => {
@@ -1107,7 +1106,7 @@ const App = () => {
                       setTransaction({
                         ...transaction,
                         isRecurring: false,
-                        recurrenceType: "", // Setzt das Wiederholungsintervall zurück, wenn "Nein" ausgewählt
+                        recurrenceType: "",
                       })
                     }
                   >
@@ -1248,8 +1247,8 @@ const App = () => {
                 variant="contained"
                 color="primary"
                 onClick={() => {
-                  setIsFilterVisible(false); // Filter ausblenden, nach dem Anwenden
-                  applyCustomFilter(); // Filter anwenden
+                  setIsFilterVisible(false);
+                  applyCustomFilter();
                 }}
               >
                 Filter anwenden
@@ -1407,8 +1406,8 @@ const App = () => {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" tick={{ dy: 10 }} />
             <YAxis
-              width={80} // Erhöht den Platz für die Y-Achse
-              tickMargin={10} // Erhöht den Abstand der Zahlen
+              width={80}
+              tickMargin={10}
               tickFormatter={(value) =>
                 new Intl.NumberFormat("de-DE", {
                   style: "decimal",

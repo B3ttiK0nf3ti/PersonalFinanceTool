@@ -3,20 +3,20 @@ import requests
 import pyotp
 
 # Teste die Registrierung
-# @pytest.mark.parametrize("email, password", [
-#     ("testuser1@example.com", "Podui%$39d8&8/)"),
-#     ("testuser2@example.com", "Podui%$39d8&8/)")
-# ])
-# def test_registration(email, password):
-#     url = 'http://localhost:5000/register'
-#     headers = {'Content-Type': 'application/json'}
-#     data = {'email': email, 'password': password}
+@pytest.mark.parametrize("email, password", [
+    ("testuser1@example.com", "Podui%$39d8&8/)"),
+    ("testuser2@example.com", "Podui%$39d8&8/)")
+])
+def test_registration(email, password):
+    url = 'http://localhost:5000/register'
+    headers = {'Content-Type': 'application/json'}
+    data = {'email': email, 'password': password}
 
-#     response = requests.post(url, json=data, headers=headers)
-#     assert response.status_code == 200
-#     assert response.json()['success'] is True
-#     assert 'qrCodeUrl' in response.json()
-#     assert 'secret' in response.json()
+    response = requests.post(url, json=data, headers=headers)
+    assert response.status_code == 200
+    assert response.json()['success'] is True
+    assert 'qrCodeUrl' in response.json()
+    assert 'secret' in response.json()
 
 def test_login():
     """Testet den Login mit MFA-Unterstützung."""
@@ -29,7 +29,7 @@ def test_login():
     response = requests.post(url, json=data, headers=headers)
     print("Login:", response.status_code, response.json())
 
-    # Falls MFA erforderlich ist, generiere den richtigen Code
+    # generieren des richtigen Code
     if response.json().get("mfaRequired"):
         totp = pyotp.TOTP(mfa_secret)  # TOTP-Instanz mit bekanntem Secret erzeugen
         mfa_code = totp.now()  # Aktuellen 6-stelligen Code generieren

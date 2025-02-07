@@ -59,6 +59,7 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
     secret = db.Column(db.String(255), nullable=True)  # Für MFA geheimen Schlüssel
 
+# DB-Modell für Transaktionen
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_email = db.Column(db.String(120), nullable=False)  # Benutzer-E-Mail
@@ -230,7 +231,7 @@ def add_transaction():
     try:
         # Holen der E-Mail des Benutzers aus dem JWT
         user_email = get_jwt_identity()
-        print(f"Aktueller Benutzer: {user_email}")  # Debugging: Log der E-Mail des Benutzers
+        print(f"Aktueller Benutzer: {user_email}") 
         
         # Transaktionsdaten aus dem JSON extrahieren
         data = request.get_json()
@@ -243,7 +244,7 @@ def add_transaction():
             raise ValueError(f"Fehlende erforderliche Felder: {', '.join(missing_fields)}")
         
         # Das Datum vor der Verarbeitung debuggen
-        transaction_date_str = data['date'].strip()  # Entfernen von Leerzeichen, falls vorhanden
+        transaction_date_str = data['date'].strip() 
         print(f"Parsing Datum: {transaction_date_str}")
 
         # Überprüfen, ob das Datum im richtigen Format ist
@@ -269,15 +270,15 @@ def add_transaction():
 
         # Transaktion erstellen
         new_transaction = Transaction(
-            user_email=user_email,  # E-Mail aus dem JWT verwenden
+            user_email=user_email,  
             type=data['type'],
             amount=data['amount'],
             category=data['category'],
             date=data['date'],
             description=data.get('description', ""),
-            is_recurring=is_recurring,  # Verwende den Wert 1 oder 0
+            is_recurring=is_recurring,  
             recurrence_type=data.get('recurrenceType', None),
-            next_due_date=next_due_date  # Berechnetes next_due_date im Format 'YYYY-MM-DD'
+            next_due_date=next_due_date  
         )
 
         # Transaktion in der DB speichern
@@ -297,10 +298,8 @@ def add_transaction():
         }), 201  # Statuscode 201 für erfolgreiches Erstellen
         
     except Exception as e:
-        print(f"Fehler beim Hinzufügen der Transaktion: {str(e)}")  # Detailierte Fehlerausgabe
-        return jsonify({"error": f"Fehler beim Speichern der Transaktion: {str(e)}"}), 500  # Fehlerbehandlung
-
-
+        print(f"Fehler beim Hinzufügen der Transaktion: {str(e)}")  
+        return jsonify({"error": f"Fehler beim Speichern der Transaktion: {str(e)}"}), 500  
 
 @app.route('/api/transactions', methods=['GET'])
 @jwt_required()
@@ -323,7 +322,7 @@ def get_transactions():
                 "category": t.category,
                 "date": t.date,
                 "description": t.description,
-                "isRecurring": t.is_recurring,  # Hier wird is_recurring übertragen
+                "isRecurring": t.is_recurring,  
                 "recurrenceType": t.recurrence_type
             } for t in transactions
         ])
@@ -366,10 +365,10 @@ def request_password_reset():
 
     # Erzeuge einen zufälligen Token
     token = secrets.token_hex(16)
-    reset_tokens[email] = token  # Temporär speichern
+    reset_tokens[email] = token  
 
     # E-Mail mit dem Token senden
-    sender_email = "deineemail@example.com"  # Ersetze mit deiner E-Mail
+    sender_email = "deineemail@example.com" 
     recipient_email = email
     subject = "Passwort zurücksetzen"
     body = f"Hier ist dein Reset-Token: {token}"
